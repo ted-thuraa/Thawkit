@@ -1224,9 +1224,9 @@ export const funnelPayload: funnelPayloadSchema = {
     { ...Quiz7PagePayload },
     { ...Quiz8PagePayload },
     // Number-input pages consumed by the calculation engine
-    // { ...QuizNumMAUPagePayload },
-    // { ...QuizNumARPUPagePayload },
-    // { ...QuizNumChurnPagePayload },
+    { ...QuizNumMAUPagePayload },
+    { ...QuizNumARPUPagePayload },
+    { ...QuizNumChurnPagePayload },
     { ...ResultPagePayload },
   ],
   created_at: "2025-06-01T08:00:00.000Z",

@@ -1,5 +1,5 @@
 import { useFunnelStore } from "@/stores/funnelStore/store";
-import { Hero1Content, PageSection } from "@/types/PageCMS/pageSchema";
+import { HeroSectionContent, PageSection } from "@/types/PageCMS/pageSchema";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 
@@ -10,7 +10,7 @@ type Props = {
 
 export const Hero1 = ({ section, pageId }: Props) => {
   const nextStep = useFunnelStore((s) => s.nextStep);
-  const content: Hero1Content = section.content as Hero1Content;
+  const content: HeroSectionContent = section.content as HeroSectionContent;
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
       {/* Left Content */}

@@ -12,7 +12,7 @@ import {
   CalcVariable,
   CategoryScoreResult,
   LeadData,
-  ResultPageContent,
+  ResultOverviewSectionContent,
   ScoreTier,
 } from "@/types/PageCMS/pageSchema";
 import { PageSection } from "@/types/PageCMS/pageSchema";
@@ -375,7 +375,7 @@ export function ResultPage({ section }: Props) {
   // DetailedCategoryResults section uses, built once per page render.
   const personalizationCtx = usePersonalizationContext();
 
-  const content = section.content as ResultPageContent;
+  const content = section.content as ResultOverviewSectionContent;
 
   const overallScore = scoreResult?.overallScore ?? finalScore ?? 0;
   // Only available once a real scoreResult has been computed (resolveToResult);

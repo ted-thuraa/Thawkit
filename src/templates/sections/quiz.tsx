@@ -5,7 +5,7 @@ import { useFunnelStore } from "@/stores/funnelStore/store";
 import {
   PageSection,
   QuestionCategory,
-  Quiz1Content,
+  QuizSectionContent,
   QuizOptions,
 } from "@/types/PageCMS/pageSchema";
 
@@ -61,7 +61,7 @@ function QuizShell({
   children,
   onBack,
 }: {
-  content: Quiz1Content;
+  content: QuizSectionContent;
   children: React.ReactNode;
   onBack: () => void;
 }) {
@@ -126,7 +126,7 @@ function ChoiceQuestion({
   sectionId,
   multi,
 }: {
-  content: Quiz1Content;
+  content: QuizSectionContent;
   sectionId: string;
   multi: boolean;
 }) {
@@ -237,7 +237,7 @@ function TextQuestion({
   sectionId,
   multiLine,
 }: {
-  content: Quiz1Content;
+  content: QuizSectionContent;
   sectionId: string;
   multiLine: boolean;
 }) {
@@ -283,7 +283,7 @@ function NumberQuestion({
   content,
   sectionId,
 }: {
-  content: Quiz1Content;
+  content: QuizSectionContent;
   sectionId: string;
 }) {
   const setAnswer = useFunnelStore((s) => s.setAnswer);
@@ -319,7 +319,7 @@ function ScaleQuestion({
   content,
   sectionId,
 }: {
-  content: Quiz1Content;
+  content: QuizSectionContent;
   sectionId: string;
 }) {
   const setAnswer = useFunnelStore((s) => s.setAnswer);
@@ -379,7 +379,7 @@ export const Quiz1 = ({ section, pageId }: Props) => {
   const prevStep = useFunnelStore((s) => s.prevStep);
   const answers = useFunnelStore((s) => s.answers);
 
-  const content = section.content as Quiz1Content;
+  const content = section.content as QuizSectionContent;
   const qType = content.questionType ?? "single_choice";
   const sectionId = section.id;
 

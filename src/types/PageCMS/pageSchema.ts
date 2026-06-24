@@ -348,7 +348,7 @@ interface SectionConfig {
 // template_id: "HEADER__STICKY_TOP__LIGHT__v1_0"
 // Layout: sticky top bar | logo | nav links | primary + secondary CTAs
 // ----------------------------------------------------------------
-interface Header1Content {
+interface NavSectionContent {
   logo: LogoConfig;
   nav_links: NavLink[];
   primary_cta: CallToAction;
@@ -359,7 +359,8 @@ interface Header1Content {
 // template_id: "HERO__SPLIT_LEFT__LIGHT__v1_0"
 // Layout: two-column | text (left) + image (right)
 // ----------------------------------------------------------------
-export interface Hero1Content {
+export interface HeroSectionContent {
+  badge?: Badge;
   eyebrow?: string; // small text above heading
   rating_badge?: {
     score: string; // e.g., "4.97/5"
@@ -373,22 +374,10 @@ export interface Hero1Content {
 }
 
 // ----------------------------------------------------------------
-// template_id: "HERO__CENTERED__LIGHT__v1_0"
-// Layout: centered text | badge | heading | subtext | CTAs | no image
-// ----------------------------------------------------------------
-interface Hero2Content {
-  badge?: Badge;
-  heading: string;
-  subtext: string;
-  primary_cta: CallToAction;
-  secondary_cta?: CallToAction;
-}
-
-// ----------------------------------------------------------------
 // template_id: "STATS__GRID_4COL__LIGHT__v1_0"
 // Layout: heading (left) + subtext + 4-column stats grid
 // ----------------------------------------------------------------
-interface Stats1Content {
+interface StatsSectionContent {
   heading: string;
   subtext?: string;
   stats: StatItem[]; // recommended: 4 items for a 4-col grid
@@ -427,7 +416,7 @@ export type ScoreBracketContent = {
   subtext?: string;
 };
 
-export interface MiniResult1Content {
+export interface MiniResultSectionContent {
   /** Small static label above the dynamic heading, e.g. "Your progress so far" */
   eyebrow?: string;
   /**
@@ -446,7 +435,7 @@ export interface MiniResult1Content {
 // template_id: "FEATURES__CARD_GRID__LIGHT__v1_0"
 // Layout: centered header + responsive card grid
 // ----------------------------------------------------------------
-interface Features1Content {
+interface FeaturesSectionContent {
   badge?: Badge;
   heading: string;
   subtext?: string;
@@ -457,7 +446,8 @@ interface Features1Content {
 // template_id: "FAQ__SPLIT_LEFT__LIGHT__v1_0"
 // Layout: two-column | left (heading + subtext + CTA) | right (accordion)
 // ----------------------------------------------------------------
-interface Faq1Content {
+interface FaqSectionContent {
+  badge?: Badge;
   heading: string;
   subtext: string;
   more_faqs_cta?: CallToAction;
@@ -466,21 +456,10 @@ interface Faq1Content {
 }
 
 // ----------------------------------------------------------------
-// template_id: "FAQ__CENTERED__LIGHT__v1_0"
-// Layout: centered | badge + heading + subtext + card-style accordion
-// ----------------------------------------------------------------
-interface Faq2Content {
-  badge: Badge;
-  heading: string;
-  subtext: string;
-  faqs: FAQItem[];
-}
-
-// ----------------------------------------------------------------
 // template_id: "CTA__SPLIT_RIGHT__DARK__v1_0"
 // Layout: dark card | text (left) + email form (right)
 // ----------------------------------------------------------------
-interface Newsletter1Content {
+interface CTAFormSection {
   heading: string;
   subtext: string;
   form_eyebrow?: string; // e.g., "Stay up to date"
@@ -494,7 +473,7 @@ interface Newsletter1Content {
 // template_id: "RESULT__SCORE_BREAKDOWN__LIGHT__v1_0"
 // Layout: score display | overall score + per-category breakdown + CTAs
 // ----------------------------------------------------------------
-export interface ResultPageContent {
+export interface ResultOverviewSectionContent {
   heading: string;
   subtext?: string;
   /** Label rendered above the numeric score, e.g. "Your readiness score" */
@@ -546,7 +525,7 @@ export type CategoryResultContent = {
  * yet) — it is not the intended default authoring path, and a well-authored
  * section should have a `categoryContent` entry for every category.
  */
-export interface DetailedCategoryResultsContent {
+export interface DetailedCategoryResultsSectionContent {
   heading?: string;
   subtext?: string;
   /** Per-category dedicated content, keyed by QuestionCategory.id. */
@@ -602,7 +581,7 @@ export interface QuizOptions {
   branchTarget?: BranchTarget;
 }
 
-export interface Quiz1Content {
+export interface QuizSectionContent {
   questionType: QuestionType;
   categoryIds?: string[];
   quizHeading: string;
@@ -890,60 +869,60 @@ type SectionDefinition =
   // ── Nav ──────────────────────────────────────────────────────────────────
   | {
       template_id: "HEADER__STICKY_TOP__LIGHT__v1_0";
-      content: Header1Content;
+      content: NavSectionContent;
     }
   // ── Hero ─────────────────────────────────────────────────────────────────
   | {
       template_id: "HERO__SPLIT_LEFT__LIGHT__v1_0";
-      content: Hero1Content;
+      content: HeroSectionContent;
     }
   | {
       template_id: "HERO__CENTERED__LIGHT__v1_0";
-      content: Hero2Content;
+      content: HeroSectionContent;
     }
   // ── Stats ─────────────────────────────────────────────────────────────────
   | {
       template_id: "STATS__GRID_4COL__LIGHT__v1_0";
-      content: Stats1Content;
+      content: StatsSectionContent;
     }
   // ── Features ─────────────────────────────────────────────────────────────
   | {
       template_id: "FEATURES__CARD_GRID__LIGHT__v1_0";
-      content: Features1Content;
+      content: FeaturesSectionContent;
     }
   // ── FAQ ───────────────────────────────────────────────────────────────────
   | {
       template_id: "FAQ__SPLIT_LEFT__LIGHT__v1_0";
-      content: Faq1Content;
+      content: FaqSectionContent;
     }
   | {
       template_id: "FAQ__CENTERED__LIGHT__v1_0";
-      content: Faq2Content;
+      content: FaqSectionContent;
     }
   // ── CTA ───────────────────────────────────────────────────────────────────
   | {
       template_id: "CTA__SPLIT_RIGHT__DARK__v1_0";
-      content: Newsletter1Content;
+      content: CTAFormSection;
     }
   // ── Quiz ──────────────────────────────────────────────────────────────────
   | {
       template_id: "QUIZ__SINGLE_STEP__LIGHT__v1_0";
-      content: Quiz1Content;
+      content: QuizSectionContent;
     }
   // ── Mini Result ──────────────────────────────────────────────────────────
   | {
       template_id: "MINIRESULT__SINGLE_STEP__LIGHT__v1_0";
-      content: MiniResult1Content;
+      content: MiniResultSectionContent;
     }
   // ── Result ────────────────────────────────────────────────────────────────
   | {
       template_id: "RESULT__SCORE_BREAKDOWN__LIGHT__v1_0";
-      content: ResultPageContent;
+      content: ResultOverviewSectionContent;
     }
   // ── Detailed Category Results ───────────────────────────────────────────
   | {
       template_id: "DETAILEDCATEGORYRESULTS__CARD_GRID__LIGHT__v1_0";
-      content: DetailedCategoryResultsContent;
+      content: DetailedCategoryResultsSectionContent;
     };
 
 /**

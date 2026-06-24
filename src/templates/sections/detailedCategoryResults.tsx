@@ -6,7 +6,7 @@ import { usePersonalizationContext } from "@/hooks/usePersonalizationContext";
 import { interpolateTemplate } from "@/lib/funnelPersonalisation/engine";
 import { PersonalizationContext } from "@/lib/funnelPersonalisation/types";
 import {
-  DetailedCategoryResultsContent,
+  DetailedCategoryResultsSectionContent,
   PageSection,
   QuestionCategory,
 } from "@/types/PageCMS/pageSchema";
@@ -129,7 +129,7 @@ const CategoryResultCard = React.memo(function CategoryResultCard({
 export function DetailedCategoryResults({ section }: Props) {
   const schema = useFunnelStore((s) => s.schema);
   const ctx = usePersonalizationContext();
-  const content = section.content as DetailedCategoryResultsContent;
+  const content = section.content as DetailedCategoryResultsSectionContent;
 
   const categories = schema?.questionCategories ?? [];
   if (categories.length === 0) return null;
