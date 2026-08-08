@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth/auth-client";
 import { useRouter } from "next/navigation";
 import { SignInTab } from "./_components/sign-in-tab";
+import { DEFAULT_LOGIN_REDIRECT } from "@/routes";
 
 type Tab = "signin" | "signup" | "email-verification" | "forgot-password";
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     authClient.getSession().then((session) => {
-      if (session.data != null) router.push("/");
+      if (session.data != null) router.push(DEFAULT_LOGIN_REDIRECT);
     });
   }, [router]);
 

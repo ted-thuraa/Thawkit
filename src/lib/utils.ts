@@ -2,9 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { projectFormSchema } from "./validators/project";
 import z from "zod";
-import { ElementNode } from "@/stores/pageEditorStore/types";
 import { nanoid } from "nanoid";
-import { ScoreTiers } from "./types/project";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,7 +16,7 @@ export function cn(...inputs: ClassValue[]) {
  * @returns - A new style object with !important added to each property
  */
 export function prioritizeStyles(
-  styles?: React.CSSProperties
+  styles?: React.CSSProperties,
 ): React.CSSProperties {
   if (!styles) return {};
 
@@ -36,14 +34,14 @@ export function prioritizeStyles(
  */
 export function hierarchicalClasses(
   baseThemeClass: string,
-  customClasses?: string
+  customClasses?: string,
 ): string {
   return cn(
     // Base theme classes
     baseThemeClass,
     // Text content class is used in theme.ts for text styling
     // Custom classes override theme classes
-    customClasses
+    customClasses,
   );
 }
 
@@ -159,82 +157,6 @@ const generateNewId = (originalId: string): string => {
   return nanoid(8); // Fallback for IDs without a prefix
 };
 
-/**
- * Recursively deep-clones an ElementNode structure, assigning a fresh, unique ID to every node.
- * This function performs an immutable operation.
- *
- * @param node The ElementNode to clone.
- * @returns A new ElementNode with a unique ID and recursively cloned children.
- */
-export const cloneTemplateWithUniqueIds = (node: ElementNode): ElementNode => {
-  // 1. Create a shallow copy of the current node to ensure immutability
-  const newNode: ElementNode = { ...node };
-
-  // 2. Assign a new unique ID
-  newNode.id = generateNewId(node.id);
-
-  // 3. Recursively process the 'content' property if it's an array (i.e., children)
-  if (Array.isArray(node.content)) {
-    // Use Array.prototype.map to create a new array of recursively cloned children
-    newNode.content = node.content.map(cloneTemplateWithUniqueIds);
-  } else if (typeof node.content === "object" && node.content !== null) {
-    // 4. Handle content object for leaf nodes (e.g., text content)
-    // Create a shallow copy of the content object to ensure full immutability
-    // This is important if the content object itself contains mutable references.
-    newNode.content = { ...node.content };
-  }
-  // If content is undefined or a primitive, it is copied by the spread operator in step 1.
-
-  // 5. Return the newly created node
-  return newNode;
-};
-
-/**
- * Recursively traverses a nested object structure and updates the `quizId`
- * for all nodes of type 'quiz'. This function emphasizes immutability
- * by creating a deep copy of the input object.
- *
- * @param node - The root PageNode of the object tree to process.
- * @param newQuizId - The new string value to assign to the quizId property.
- * @returns A new PageNode object with updated quiz IDs.
- */
-export function updateTemplateWithQuizId(
-  node: ElementNode,
-  newQuizId: string
-): ElementNode {
-  // 1. IMMUTABILITY: Create a deep copy of the current node to avoid side effects.
-  // Using structuredClone is a modern and efficient way to deep-clone objects.
-  const clonedNode = structuredClone(node);
-
-  // 2. NODE DETECTION: Check if the current node is the target type.
-  if (clonedNode.type === "LandingPage_Quiz") {
-    // 3. VALIDATION & UPDATE:
-    // Ensure 'content' exists, is an object, and not an array before updating.
-    if (clonedNode.settings) {
-      clonedNode.settings.quizId = newQuizId;
-    } else {
-      // Gracefully handle malformed quiz nodes.
-      console.warn(
-        `Skipping malformed quiz node with id: ${clonedNode.id}. 'content' is not a valid object.`
-      );
-    }
-    return clonedNode;
-  }
-
-  // 4. RECURSIVE TRAVERSAL:
-  // If the node has a 'content' property that is an array, recurse into it.
-  // This is the primary mechanism for traversing the tree structure.
-  if (Array.isArray(clonedNode.content)) {
-    clonedNode.content = clonedNode.content.map((childNode) =>
-      // Process each child node and replace it with the potentially updated version.
-      updateTemplateWithQuizId(childNode, newQuizId)
-    );
-  }
-
-  // 5. RETURN: Return the fully processed (and potentially updated) node.
-  return clonedNode;
-}
-
 export const sanitizeDomain = (domain: string): string => {
   let cleanedDomain = domain;
   if (cleanedDomain.endsWith("/")) {
@@ -246,11 +168,11 @@ export const sanitizeDomain = (domain: string): string => {
   return cleanedDomain;
 };
 
-export function sortScoreTiersByRange(tiers: Array<ScoreTiers>) {
-  if (!Array.isArray(tiers)) return [];
+// export function sortScoreTiersByRange(tiers: Array<ScoreTiers>) {
+//   if (!Array.isArray(tiers)) return [];
 
-  return [...tiers].sort((a, b) => a.scoreFrom - b.scoreFrom);
-}
+//   return [...tiers].sort((a, b) => a.scoreFrom - b.scoreFrom);
+// }
 
 export const getBrightness = ({
   r,

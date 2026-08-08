@@ -18,8 +18,8 @@ type Props = {
   params: { domain: string };
 };
 
-const Layout = async ({ children, params }: Props) => {
+const FunnelLayout = async ({ children, params }: Props) => {
   return <div>{children}</div>;
 };
 
-export default Layout;
+export default FunnelLayout;

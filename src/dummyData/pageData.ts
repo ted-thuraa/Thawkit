@@ -623,17 +623,47 @@ export const MiniResultPagePayload: PagePayloadSchema = {
   published_at: "2025-06-15T09:00:00.000Z",
   sections: [
     {
-      id: "sec_quiz_04",
+      id: "sec_mini_result_01",
       order: 0,
       type: "mini_result",
       template_id: "MINIRESULT__SINGLE_STEP__LIGHT__v1_0",
       is_visible: true,
       content: {
-        brackets: [],
-        // heading:
-        //   "You are passionate about empowering individuals and businesses to take control of their finances and achieve their financial goals.",
-        // subtext:
-        //   "Find out more how you can dedicated to revolutionizing the way individuals and businesses manage their finances. ",
+        eyebrow: "Your progress so far",
+        brackets: [
+          {
+            id: "bracket_high",
+            priority: 20,
+            predicate: {
+              operator: "AND",
+              conditions: [{ type: "score_above", threshold: 65 }],
+            },
+            icon: "🚀",
+            heading: "You're already ahead of the curve",
+            subtext:
+              "Your responses show a strong foundation across the areas that matter most. The questions ahead will help us fine-tune your personalised action plan.",
+          },
+          {
+            id: "bracket_mid",
+            priority: 10,
+            predicate: {
+              operator: "AND",
+              conditions: [{ type: "score_above", threshold: 40 }],
+            },
+            icon: "📈",
+            heading: "Good momentum — let's build on it",
+            subtext:
+              "You're making solid progress. A few targeted adjustments in the right areas could unlock your next stage of growth. Keep going.",
+          },
+          {
+            // Fallback — no predicate; always matches when no conditional bracket does.
+            id: "bracket_fallback",
+            icon: "🎯",
+            heading: "Every great product starts somewhere",
+            subtext:
+              "Your honest answers show real clarity about your current challenges. The insights ahead will help you map out the right path forward.",
+          },
+        ],
         goForward_cta: { label: "Continue", href: "#" },
         goBack_cta: { label: "Back", href: "#" },
       },
@@ -749,7 +779,7 @@ export const Quiz7PagePayload: PagePayloadSchema = {
       is_visible: true,
       content: {
         questionType: "long_text",
-        categoryIds: [""],
+        categoryIds: [],
         quizHeading: "What tools or platforms are you currently using?",
         quizSubtext: "",
         quizOptions: [],
@@ -915,6 +945,9 @@ export const ResultPagePayload: PagePayloadSchema = {
   created_at: "2025-06-01T08:00:00.000Z",
   updated_at: "2025-09-15T14:32:00.000Z",
   sections: [
+    // ── Always-visible: main score breakdown ─────────────────────────────────
+    // No `visibility` field → treated as "always-visible" by the renderer.
+    // Zero regression for sections authored before the Audiences feature.
     {
       id: "sec_result_01",
       order: 0,
@@ -930,6 +963,81 @@ export const ResultPagePayload: PagePayloadSchema = {
         scoreLabel: "Investment Readiness Score",
         welcome_message: "{{first_name}}, here are your results 🎯",
         retakeCta: { label: "Retake Quiz" },
+      },
+    },
+
+    // ── Audience-based: detailed breakdown for high-performers ──────────────
+    // Rendered only when the respondent matches the "high_performers" audience
+    // (overall score ≥ 67, i.e. Tier 3). Founders and PMs who are scaling fast
+    // see an in-depth category analysis; others see the lighter overview above.
+    {
+      id: "sec_result_detailed_categories",
+      order: 1,
+      type: "detailed_category_results",
+      template_id: "DETAILEDCATEGORYRESULTS__CARD_GRID__LIGHT__v1_0",
+      is_visible: true,
+      visibility: {
+        mode: "audience-based",
+        audienceIds: ["aud_high_performers", "aud_scaling_founders"],
+      },
+      content: {
+        heading: "A closer look at your strengths",
+        subtext:
+          "Here's how you performed across each pillar of product-led growth.",
+        categoryContent: {},
+        fallbackTemplate:
+          "Your score in {{category.current.title}} came in at {{category.current.percentage}}%, " +
+          "placing you in the {{category.current.tier}} tier. " +
+          "This is an area where focused attention can unlock meaningful gains — " +
+          "review the resources in your personalised plan for next steps.",
+      },
+    },
+
+    // ── Audience-based: early-stage CTA ─────────────────────────────────────
+    // Shown only to respondents in the "early_stage" audience (Pre-launch or
+    // Early traction stage, score below 50). Guides them toward the webinar
+    // rather than a self-serve upgrade flow that would be premature.
+    {
+      id: "sec_result_cta_early",
+      order: 2,
+      type: "cta",
+      template_id: "CTA__SPLIT_RIGHT__DARK__v1_0",
+      is_visible: true,
+      visibility: {
+        mode: "audience-based",
+        audienceIds: ["aud_early_stage"],
+      },
+      content: {
+        heading: "Ready to accelerate?",
+        subtext:
+          "Join our live webinar and learn the exact frameworks used by SaaS teams to go from traction to scale — without the guesswork.",
+        form_eyebrow: "Save your spot",
+        input_placeholder: "Enter your email",
+        submit_label: "Register for free",
+        privacy_notice: "By registering you agree to our",
+        privacy_policy_cta: {
+          label: "Privacy Policy",
+          href: "/privacy",
+          variant: "link",
+        },
+      },
+    },
+
+    // ── Visibility mode "none" demo ──────────────────────────────────────────
+    // This section is authored but intentionally suppressed for all respondents.
+    // Demonstrates the "none" mode: the section exists in the schema for future
+    // activation but never renders during the current campaign.
+    {
+      id: "sec_result_hidden_upsell",
+      order: 3,
+      type: "cta",
+      template_id: "CTA__SPLIT_RIGHT__DARK__v1_0",
+      is_visible: true,
+      visibility: { mode: "none" },
+      content: {
+        heading: "Upgrade to Pro",
+        subtext: "Unlock advanced analytics and unlimited funnel steps.",
+        submit_label: "Start free trial",
       },
     },
   ],
@@ -992,6 +1100,197 @@ export const funnelPayload: funnelPayloadSchema = {
       title: "Personalisation",
       description: "",
       icon: "⚖️",
+    },
+  ],
+
+  // ── Audience definitions ─────────────────────────────────────────────────
+  // Mock data for the Audiences feature. Each audience's predicate is
+  // evaluated once in resolveToResult() against the respondent's full
+  // post-submission context (answers + leadData + scoreResult). The resolved
+  // Set<audienceId> is stored in Zustand and consumed by SectionTypeRenderer.
+  //
+  // Audience IDs are referenced in ResultPagePayload sections via
+  // `visibility.audienceIds`. Adding a new audience here and referencing it
+  // in a section's visibility config is the complete authoring loop.
+  audiences: [
+    // ── High performers ───────────────────────────────────────────────────
+    // Respondents whose overall score falls in Tier 3 (≥ 67%). They see the
+    // detailed per-category breakdown section on the result page.
+    {
+      id: "aud_high_performers",
+      name: "High Performers — Tier 3",
+      description:
+        "Respondents who scored 67% or above overall, placing them in the top tier.",
+      retroactive: true,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            type: "category_score",
+            categoryId: "overall",
+            metric: "percentage",
+            operator: "gte",
+            value: 67,
+          },
+        ],
+      },
+      created_at: "2025-10-01T00:00:00.000Z",
+    },
+
+    // ── Scaling founders ──────────────────────────────────────────────────
+    // Respondents who selected "Founder/CEO" as their role AND are at the
+    // Scaling or Established stage. Also sees the detailed breakdown section.
+    // Demonstrates AND logic combining a quiz answer condition with a second
+    // quiz answer condition.
+    {
+      id: "aud_scaling_founders",
+      name: "Scaling & Established Founders",
+      description:
+        'Founder or CEO respondents who are at the "Scaling" or "Established" stage.',
+      retroactive: true,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            type: "option_selected",
+            sectionId: "sec_quiz_01", // "What is your role?"
+            optionIds: ["founder_or_ceo"],
+          },
+          {
+            // Nested OR group: Scaling OR Established stage
+            operator: "OR",
+            conditions: [
+              {
+                type: "option_selected",
+                sectionId: "sec_quiz_02", // "What stage is your SaaS business at?"
+                optionIds: ["Scaling"],
+              },
+              {
+                type: "option_selected",
+                sectionId: "sec_quiz_02",
+                optionIds: ["Established"],
+              },
+            ],
+          },
+        ],
+      },
+      created_at: "2025-10-01T00:00:00.000Z",
+    },
+
+    // ── Early stage ───────────────────────────────────────────────────────
+    // Respondents at Pre-launch or Early traction stage whose overall score
+    // is below 50%. They see the webinar registration CTA instead of the
+    // detailed breakdown, since self-serve resources would be premature.
+    // Demonstrates AND logic combining a quiz answer with a score condition.
+    {
+      id: "aud_early_stage",
+      name: "Early Stage — Below 50%",
+      description:
+        "Pre-launch or Early traction respondents who scored below 50% overall.",
+      retroactive: false,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            // Nested OR: Pre-launch OR Early traction
+            operator: "OR",
+            conditions: [
+              {
+                type: "option_selected",
+                sectionId: "sec_quiz_02",
+                optionIds: ["Prelaunch"],
+              },
+              {
+                type: "option_selected",
+                sectionId: "sec_quiz_02",
+                optionIds: ["Early_traction"],
+              },
+            ],
+          },
+          {
+            type: "category_score",
+            categoryId: "overall",
+            metric: "percentage",
+            operator: "lt",
+            value: 50,
+          },
+        ],
+      },
+      created_at: "2025-10-01T00:00:00.000Z",
+    },
+
+    // ── Personalisation opt-in ────────────────────────────────────────────
+    // Respondents who answered "Yes please" to receiving additional resources.
+    // Demonstrates a lead_field_equals condition combined with quiz answer.
+    // (In a real flow this would gate a nurture email section or PDF offer.)
+    {
+      id: "aud_resources_optin",
+      name: "Resources Opt-In",
+      description:
+        "Respondents who opted in to receive additional resources after the event.",
+      retroactive: true,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            type: "option_selected",
+            sectionId: "sec_quiz_08", // "Would you like to receive additional resources?"
+            optionIds: ["yes_please"],
+          },
+        ],
+      },
+      created_at: "2025-10-01T00:00:00.000Z",
+    },
+
+    // ── High-score lead form respondents ─────────────────────────────────
+    // Demonstrates lead_field_equals: respondents from the technology industry
+    // who scored highly. In production this would gate a sales-led CTA.
+    {
+      id: "aud_tech_high_score",
+      name: "Tech Industry — High Score",
+      description:
+        "Technology industry respondents who scored 67% or above overall.",
+      retroactive: true,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            type: "lead_field_equals",
+            fieldId: "industry",
+            operator: "eq",
+            value: "tech",
+          },
+          {
+            type: "category_score",
+            categoryId: "overall",
+            metric: "percentage",
+            operator: "gte",
+            value: 67,
+          },
+        ],
+      },
+      created_at: "2025-10-02T00:00:00.000Z",
+    },
+
+    // ── Lowest category: "About you" ─────────────────────────────────────
+    // Demonstrates category_rank: respondents whose weakest category is
+    // "About you". In production this would gate a targeted improvement guide.
+    {
+      id: "aud_weakest_about_you",
+      name: 'Weakest Category: "About You"',
+      description: 'Respondents whose lowest-scoring category is "About you".',
+      retroactive: false,
+      predicate: {
+        operator: "AND",
+        conditions: [
+          {
+            type: "category_rank",
+            rank: "lowest",
+            categoryId: "About_you",
+          },
+        ],
+      },
+      created_at: "2025-10-02T00:00:00.000Z",
     },
   ],
   lead_form: {
@@ -1219,6 +1518,7 @@ export const funnelPayload: funnelPayloadSchema = {
     { ...Quiz2PagePayload },
     { ...Quiz3PagePayload },
     { ...Quiz4PagePayload },
+    { ...MiniResultPagePayload },
     { ...Quiz5PagePayload },
     { ...Quiz6PagePayload },
     { ...Quiz7PagePayload },

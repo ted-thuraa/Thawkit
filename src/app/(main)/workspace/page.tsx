@@ -30,12 +30,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import React from "react";
-import { NewProjectButton } from "./_components/create-project";
-import {
-  BasicProjectListItem,
-  getBasicProjectDetails,
-  getOrganizationProjects,
-} from "@/lib/querries/project";
 import ProjectsList from "@/app/_components/projectsList";
 
 type Props = {
@@ -47,26 +41,25 @@ type Props = {
 };
 
 const WorkSpaceMainPage = async ({ searchParams }: Props) => {
-  const projectsData = await getOrganizationProjects();
+  //const projectsData = await getOrganizationProjects();
 
   // 2. Check the result structure (Error Handling)
-  let projects: BasicProjectListItem[] = [];
+  //let projects: BasicProjectListItem[] = [];
 
-  if (projectsData.success) {
-    projects = projectsData.data;
-  } else {
-    // 3. Handle the error case (e.g., show an error message, log it)
-    console.error("Error fetching projects:", projectsData.error);
-    // You could render an error state component here instead of the list
-    return null;
-  }
+  // if (projectsData.success) {
+  //   projects = projectsData.data;
+  // } else {
+  //   // 3. Handle the error case (e.g., show an error message, log it)
+  //   console.error("Error fetching projects:", projectsData.error);
+  //   // You could render an error state component here instead of the list
+  //   return null;
+  // }
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between ">
           <h3 className="text-xl font-semibold text-gray-800">Projects</h3>
-          <NewProjectButton />
         </div>
 
         <div className="mb-6 flex flex-row flex-nowrap items-center justify-between gap-6 ">
@@ -101,8 +94,9 @@ const WorkSpaceMainPage = async ({ searchParams }: Props) => {
           </div>
         </div>
 
-        <div>
-          <ProjectsList projects={projects} />
+        <div className="text-gray-800">
+          app dashborad
+          {/* <ProjectsList projects={projects} /> */}
         </div>
       </div>
     </div>

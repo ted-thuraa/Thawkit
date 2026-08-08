@@ -1,11 +1,10 @@
-// db/relations.ts
+// db/schemas/relations.ts
+
 import { relations } from "drizzle-orm";
 import * as auth from "./auth-schema";
-import * as projects from "./projects-schema";
-import * as funnel from "./funnel-shema";
-import { analyticsEvents } from "./analytics";
+import * as campaigns from "./campaigns-schema";
 
-// User Relations
+// ── User Relations ──────────────────────────────────────────────────────────
 export const userRelations = relations(auth.user, ({ many }) => ({
   sessions: many(auth.session),
   accounts: many(auth.account),
@@ -13,9 +12,13 @@ export const userRelations = relations(auth.user, ({ many }) => ({
   passkeys: many(auth.passkey),
   members: many(auth.member),
   invitation: many(auth.invitation),
+  // FIX (Phase 1): auth-schema.ts's `subscription` table already declared a
+  // FK to user.id, but no relation entry existed on either side — this
+  // silently blocked `db.query.user.findFirst({ with: { subscriptions: true } })`.
+  subscriptions: many(auth.subscription),
 }));
 
-// Session Relations
+// ── Session Relations ───────────────────────────────────────────────────────
 export const sessionRelations = relations(auth.session, ({ one }) => ({
   user: one(auth.user, {
     fields: [auth.session.userId],
@@ -29,7 +32,7 @@ export const sessionRelations = relations(auth.session, ({ one }) => ({
   }),
 }));
 
-// Account Relations
+// ── Account Relations ───────────────────────────────────────────────────────
 export const accountRelations = relations(auth.account, ({ one }) => ({
   user: one(auth.user, {
     fields: [auth.account.userId],
@@ -38,7 +41,7 @@ export const accountRelations = relations(auth.account, ({ one }) => ({
   }),
 }));
 
-// TwoFactor Relations
+// ── TwoFactor Relations ─────────────────────────────────────────────────────
 export const twoFactorRelations = relations(auth.twoFactor, ({ one }) => ({
   user: one(auth.user, {
     fields: [auth.twoFactor.userId],
@@ -47,7 +50,7 @@ export const twoFactorRelations = relations(auth.twoFactor, ({ one }) => ({
   }),
 }));
 
-// Passkey Relations
+// ── Passkey Relations ───────────────────────────────────────────────────────
 export const passkeyRelations = relations(auth.passkey, ({ one }) => ({
   user: one(auth.user, {
     fields: [auth.passkey.userId],
@@ -56,25 +59,34 @@ export const passkeyRelations = relations(auth.passkey, ({ one }) => ({
   }),
 }));
 
-// Organization Relations
+// ── Organization ("Workspace") Relations ────────────────────────────────────
+//
+// `organization` is Better-Auth's table, but it IS ThawKit's Workspace
+// entity per the architecture roadmap (Module 1). Every tenant-owned row in
+// the funnel domain — campaigns and funnels today, and every table Phase 3
+// introduces (pages, submissions, contacts, audiences, etc.) — carries a
+// direct organizationId FK back to this table, per the Phase 2 tenancy
+// hardening pattern (see campaigns-schema.ts).
 export const organizationRelations = relations(
   auth.organization,
-  ({ many, one }) => ({
-    media: many(projects.projectFiles),
-    projects: many(projects.projects),
+  ({ many }) => ({
     members: many(auth.member),
     invitation: many(auth.invitation),
-    // owner: one(auth.user, {
-    //   fields: [auth.organization.ownerId],
-    //   references: [auth.user.id],
-    // }),
     activeSessions: many(auth.session, {
       relationName: "activeauth.organizationessions",
     }),
-  })
+    // ADDED (Phase 2): completes the bidirectional relation now that
+    // campaigns/funnels carry direct organizationId FKs.
+    campaigns: many(campaigns.campaigns, {
+      relationName: "organizationCampaigns",
+    }),
+    funnels: many(campaigns.funnels, {
+      relationName: "organizationFunnels",
+    }),
+  }),
 );
 
-// Member Relations
+// ── Member Relations ────────────────────────────────────────────────────────
 export const memberRelations = relations(auth.member, ({ one }) => ({
   organization: one(auth.organization, {
     fields: [auth.member.organizationId],
@@ -88,7 +100,7 @@ export const memberRelations = relations(auth.member, ({ one }) => ({
   }),
 }));
 
-// Invitation Relations
+// ── Invitation Relations ────────────────────────────────────────────────────
 export const invitationRelations = relations(auth.invitation, ({ one }) => ({
   organization: one(auth.organization, {
     fields: [auth.invitation.organizationId],
@@ -102,184 +114,49 @@ export const invitationRelations = relations(auth.invitation, ({ one }) => ({
   }),
 }));
 
-// projects.media Relations
-// projectFiles Relations
-export const projectFilesRelations = relations(
-  projects.projectFiles,
+// ── Subscription Relations ──────────────────────────────────────────────────
+// ADDED (Phase 1): was entirely missing despite auth-schema.ts already
+// defining subscription.userId as a FK to user.id.
+export const subscriptionRelations = relations(
+  auth.subscription,
   ({ one }) => ({
-    organization: one(auth.organization, {
-      fields: [projects.projectFiles.organizationId],
-      references: [auth.organization.id],
-      relationName: "organizationProjectFiles", // Renamed for clarity
+    user: one(auth.user, {
+      fields: [auth.subscription.userId],
+      references: [auth.user.id],
+      relationName: "userSubscriptions",
     }),
-    // ADDED: Defines the 'many-side' of the relationship
-    project: one(projects.projects, {
-      fields: [projects.projectFiles.projectId],
-      references: [projects.projects.id],
-      relationName: "projectFiles", // This name will be used by the 'one-side' (project)
-    }),
-  })
+  }),
 );
 
-// Project Relations
-export const projectRelations = relations(
-  projects.projects,
+// ── Campaign Relations ──────────────────────────────────────────────────────
+export const campaignRelations = relations(
+  campaigns.campaigns,
   ({ one, many }) => ({
     organization: one(auth.organization, {
-      fields: [projects.projects.organizationId],
+      fields: [campaigns.campaigns.organizationId],
       references: [auth.organization.id],
-      relationName: "organizationProjects",
+      relationName: "organizationCampaigns",
     }),
-    quizFieldCategories: many(projects.quizFieldCategories),
-    projectQuizFields: many(projects.projectQuizFields),
-
-    quizResponses: many(projects.quizResponses),
-    scoreTiers: many(projects.scoreTiers),
-    funnel: one(funnel.funnels, {
-      fields: [projects.projects.id],
-      references: [funnel.funnels.projectId],
-      relationName: "projectFunnel",
+    funnels: many(campaigns.funnels, {
+      relationName: "campaignFunnels",
     }),
-    // ADDED: Defines the 'one-side' of the relationship
-    projectFiles: many(projects.projectFiles),
-  })
-);
-
-// Funnel Relations (One-to-One with Project enforced by PK)
-export const funnelRelations = relations(funnel.funnels, ({ one, many }) => ({
-  project: one(projects.projects, {
-    fields: [funnel.funnels.projectId],
-    references: [projects.projects.id],
-    relationName: "funnelProject",
   }),
-  funnelPages: many(funnel.funnelPages),
-  classNames: many(funnel.classNames),
-}));
-
-// Project Quiz Field Relations
-export const projectQuizFieldRelations = relations(
-  projects.projectQuizFields,
-  ({ one, many }) => ({
-    project: one(projects.projects, {
-      fields: [projects.projectQuizFields.projectId],
-      references: [projects.projects.id],
-      relationName: "fieldProject",
-    }),
-    quizFieldOptions: many(projects.quizFieldOptions),
-    quizAnswers: many(projects.quizAnswers),
-  })
 );
 
-// Quiz Field Option Relations
-export const quizFieldOptionRelations = relations(
-  projects.quizFieldOptions,
-  ({ one }) => ({
-    projectQuizField: one(projects.projectQuizFields, {
-      fields: [projects.quizFieldOptions.projectQuizFieldId],
-      references: [projects.projectQuizFields.id],
-      relationName: "optionField",
-    }),
-  })
-);
-
-// Quiz Field Category Relations
-export const quizFieldCategoryRelations = relations(
-  projects.quizFieldCategories,
-  ({ one, many }) => ({
-    project: one(projects.projects, {
-      fields: [projects.quizFieldCategories.projectId],
-      references: [projects.projects.id],
-      relationName: "categoryProject",
-    }),
-    scores: many(projects.scores),
-  })
-);
-
-// Score Tier Relations
-export const scoreTierRelations = relations(
-  projects.scoreTiers,
-  ({ one, many }) => ({
-    project: one(projects.projects, {
-      fields: [projects.scoreTiers.projectId],
-      references: [projects.projects.id],
-      relationName: "tierProject",
-    }),
-    scores: many(projects.scores),
-  })
-);
-
-// Quiz Response Relations
-export const quizResponseRelations = relations(
-  projects.quizResponses,
-  ({ one, many }) => ({
-    project: one(projects.projects, {
-      fields: [projects.quizResponses.projectId],
-      references: [projects.projects.id],
-      relationName: "responseProject",
-    }),
-
-    quizAnswers: many(projects.quizAnswers),
-    scores: many(projects.scores),
-  })
-);
-
-// Quiz Answer Relations
-export const quizAnswerRelations = relations(
-  projects.quizAnswers,
-  ({ one }) => ({
-    quizResponse: one(projects.quizResponses, {
-      fields: [projects.quizAnswers.quizResponseId],
-      references: [projects.quizResponses.id],
-      relationName: "answerResponse",
-    }),
-    projectQuizField: one(projects.projectQuizFields, {
-      fields: [projects.quizAnswers.projectQuizFieldId],
-      references: [projects.projectQuizFields.id],
-      relationName: "answerField",
-    }),
-  })
-);
-
-// Score Relations
-export const scoreRelations = relations(projects.scores, ({ one }) => ({
-  quizResponse: one(projects.quizResponses, {
-    fields: [projects.scores.quizResponseId],
-    references: [projects.quizResponses.id],
-    relationName: "scoreResponse",
+// ── Funnel Relations ────────────────────────────────────────────────────────
+// ADDED (Phase 2): previously did not exist at all — only the campaign→funnel
+// direction was declared (as `funnel: many(campaigns.funnels)` on
+// campaignRelations), so `db.query.funnels.findFirst({ with: { organization: true } })`
+// had no relation to traverse. Now covers both of funnels' FKs.
+export const funnelRelations = relations(campaigns.funnels, ({ one }) => ({
+  organization: one(auth.organization, {
+    fields: [campaigns.funnels.organizationId],
+    references: [auth.organization.id],
+    relationName: "organizationFunnels",
   }),
-  category: one(projects.quizFieldCategories, {
-    fields: [projects.scores.categoryId],
-    references: [projects.quizFieldCategories.id],
-    relationName: "scoreCategory",
-  }),
-  scoreTier: one(projects.scoreTiers, {
-    fields: [projects.scores.scoreTierId],
-    references: [projects.scoreTiers.id],
-    relationName: "scoreTier",
-  }),
-}));
-
-// Class Name Relations
-export const classNameRelations = relations(funnel.classNames, ({ one }) => ({
-  funnel: one(funnel.funnels, {
-    fields: [funnel.classNames.funnelId],
-    references: [funnel.funnels.id],
-    relationName: "classNameFunnel",
-  }),
-}));
-
-// Funnel Page Relations
-export const funnelPageRelations = relations(funnel.funnelPages, ({ one }) => ({
-  funnel: one(funnel.funnels, {
-    fields: [funnel.funnelPages.funnelId],
-    references: [funnel.funnels.id],
-    relationName: "pageFunnel",
-  }),
-}));
-
-export const analyticsRelations = relations(analyticsEvents, ({ one }) => ({
-  project: one(projects.projects, {
-    fields: [analyticsEvents.projectId],
-    references: [projects.projects.id],
+  campaign: one(campaigns.campaigns, {
+    fields: [campaigns.funnels.campaignId],
+    references: [campaigns.campaigns.id],
+    relationName: "campaignFunnels",
   }),
 }));

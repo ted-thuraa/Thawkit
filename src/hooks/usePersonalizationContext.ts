@@ -18,9 +18,11 @@ export function usePersonalizationContext(): PersonalizationContext {
   const schema = useFunnelStore((s) => s.schema);
   const scoreResult = useFunnelStore((s) => s.scoreResult);
   const leadData = useFunnelStore((s) => s.leadData);
+  const calcResults = useFunnelStore((s) => s.calcResults);
 
   return useMemo(
-    () => buildPersonalizationContext(schema, scoreResult, leadData),
-    [schema, scoreResult, leadData],
+    () =>
+      buildPersonalizationContext(schema, scoreResult, leadData, calcResults),
+    [schema, scoreResult, leadData, calcResults],
   );
 }

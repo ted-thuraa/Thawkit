@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Bell, Menu, Home, Loader2Icon } from "lucide-react";
+import { Bell, Menu, Home } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -11,7 +11,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { ProfileForm } from "./profileForm";
@@ -19,12 +18,10 @@ import { SecurityTab } from "./securityTab";
 import { LinkedAccountsTab } from "./linkedAccounts";
 import { ReactNode, Suspense } from "react";
 import { useCurrentSession } from "@/hooks/sessionClient";
-import { getServerSession } from "@/lib/sessionServer";
 import { LoadingSuspense } from "../global/loadingSuspense";
 
 export function AccountSettings({}) {
   const { data: session } = useCurrentSession();
-  const { isMobile } = useSidebar();
   if (session == null) return;
 
   const items = [
@@ -64,7 +61,7 @@ export function AccountSettings({}) {
               <SidebarGroupContent className="h-full">
                 <TabsList
                   className={cn(
-                    "flex flex-col justify-start w-56 border-r bg-white p-1 rounded-none h-full"
+                    "flex flex-col justify-start w-56 border-r bg-white p-1 rounded-none h-full",
                   )}
                 >
                   <SidebarMenu>
@@ -75,7 +72,7 @@ export function AccountSettings({}) {
                           className={cn(
                             "flex items-center  gap-3 rounded-md p-0 text-sm font-medium text-sidebar-foreground transition-colors",
                             "hover:bg-white hover:text-sidebar-primary",
-                            "data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+                            "data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm",
                           )}
                         >
                           <SidebarMenuButton className="px-2 py-1.5 h-full w-full flex items-center">

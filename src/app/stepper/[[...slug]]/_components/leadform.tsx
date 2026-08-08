@@ -263,6 +263,7 @@ function FieldError({ message }: { message: string }) {
  */
 export function LeadFormPage() {
   const schema = useFunnelStore((s) => s.schema);
+  const leadData = useFunnelStore((s) => s.leadData);
   const submitLeadForm = useFunnelStore((s) => s.submitLeadForm);
   const skipLeadForm = useFunnelStore((s) => s.skipLeadForm);
   const prevStep = useFunnelStore((s) => s.prevStep);
@@ -274,7 +275,11 @@ export function LeadFormPage() {
   const [values, setValues] = useState<RawValues>(() => {
     const init: RawValues = {};
     (leadForm?.fields ?? []).forEach((f) => {
-      init[f.id] = f.type === "custom_checkbox" ? false : "";
+      const existing = leadData[f.id];
+      init[f.id] =
+        f.type === "custom_checkbox"
+          ? Boolean(existing ?? false)
+          : String(existing ?? "");
     });
     return init;
   });

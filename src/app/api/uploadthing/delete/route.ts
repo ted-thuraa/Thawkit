@@ -1,12 +1,16 @@
-import { currentUser } from "@/lib/authServer";
 import { UTApi } from "uploadthing/server";
 import { NextResponse } from "next/server";
+import { getServerSession } from "@/lib/sessionServer";
 
 // Initialize UTApi with your API key (securely from environment variables)
 export const utapi = new UTApi();
 
 export async function POST(req: Request) {
-  const user = await currentUser(); // Or your preferred auth check
+  const sessionData = await getServerSession();
+  if (!sessionData) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const user = sessionData.user; // Or your preferred auth check
 
   // 1. Check for authentication
   if (!user) {
@@ -19,7 +23,7 @@ export async function POST(req: Request) {
   if (!fileKey || typeof fileKey !== "string") {
     return NextResponse.json(
       { error: "File key is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -37,7 +41,7 @@ export async function POST(req: Request) {
       // If UploadThing indicates failure (e.g., file not found, though it might still return success)
       return NextResponse.json(
         { error: "Failed to delete file from storage." },
-        { status: 500 } // Or appropriate status
+        { status: 500 }, // Or appropriate status
       );
     }
   } catch (error) {
@@ -45,7 +49,7 @@ export async function POST(req: Request) {
     // Handle potential errors during the API call
     return NextResponse.json(
       { error: "Internal server error during file deletion." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

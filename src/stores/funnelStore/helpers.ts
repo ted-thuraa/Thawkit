@@ -3,7 +3,7 @@ import {
   FunnelAnswers,
   BranchPredicate,
   PageSection,
-  Quiz1Content,
+  QuizSectionContent,
   QuizOptions,
   QuestionCategory,
   QuestionType,
@@ -12,6 +12,12 @@ import {
   QuestionScoreResult,
   FunnelScoreResult,
   ScoreTier,
+  // ── Audience segmentation types ───────────────────────────────────────────
+  AudienceCondition,
+  AudiencePredicate,
+  AudienceDefinition,
+  SectionVisibility,
+  LeadData,
   // ── Calculation engine types ──────────────────────────────────────────────
   CalcExpression,
   CalcVariable,
@@ -37,13 +43,13 @@ export function evaluateBranchCondition(
 ): boolean {
   switch (condition.type) {
     case "option_selected": {
-      const selected =
-        (answers[condition.sectionId] as string[] | undefined) ?? [];
+      const rawAnswer = answers[condition.sectionId];
+      const selected = Array.isArray(rawAnswer) ? rawAnswer : [];
       return condition.optionIds.some((id) => selected.includes(id));
     }
     case "option_not_selected": {
-      const selected =
-        (answers[condition.sectionId] as string[] | undefined) ?? [];
+      const rawAnswer = answers[condition.sectionId];
+      const selected = Array.isArray(rawAnswer) ? rawAnswer : [];
       return !condition.optionIds.some((id) => selected.includes(id));
     }
     case "score_above":
@@ -123,7 +129,295 @@ export function resolveBracket<
   return sorted.find((b) => !b.predicate);
 }
 
-// ─── Score tiers ─────────────────────────────────────────────────────────────
+// ─── Audience segmentation — evaluation layer ─────────────────────────────
+//
+// Pure, store-free evaluators. The same AudienceCondition / AudiencePredicate
+// grammar is reusable server-side for retroactive batch re-segmentation
+// (Node.js worker, edge function) without any React or Zustand dependency.
+//
+// Design invariants:
+//   • evaluateAudienceCondition delegates existing BranchCondition types to
+//     the already-tested evaluateBranchCondition — no duplication.
+//   • evaluateAudiencePredicate recurses naturally over nested groups
+//     (AudiencePredicate within AudiencePredicate) via the type discriminant.
+//   • resolveAudienceMembership is called ONCE in resolveToResult (store.ts),
+//     never on every render — the Set is stored in Zustand state.
+//   • resolveSectionVisibility is pure and cheap — called inside
+//     SectionTypeRenderer before the switch dispatch.
+
+/**
+ * Full context required to evaluate any AudienceCondition variant.
+ * All fields are already available in the store at result-page time:
+ *   - answers      → FunnelState.answers
+ *   - leadData     → FunnelState.leadData
+ *   - scoreResult  → FunnelState.scoreResult (set by resolveToResult)
+ */
+export type AudienceEvaluationContext = {
+  answers: FunnelAnswers;
+  leadData: LeadData;
+  scoreResult: FunnelScoreResult;
+};
+
+/**
+ * Evaluates a single AudienceCondition leaf node.
+ *
+ * Handles the three new audience condition types:
+ *   lead_field_equals — compares a lead form field value using the specified
+ *     operator. String comparisons are case-insensitive. Numeric comparisons
+ *     cast the stored value to float; returns false when the cast fails.
+ *   category_rank — determines whether the named category holds the highest
+ *     or lowest score rank. Ties are inclusive (both tied categories qualify).
+ *   category_score — compares a category or overall score metric against a
+ *     threshold using a numeric operator. tier_id comparisons use eq/neq only
+ *     (other operators return false for non-numeric tier IDs).
+ *
+ * BranchCondition types (option_selected, option_not_selected, score_above,
+ * score_below) delegate to the existing evaluateBranchCondition, which already
+ * handles the `scores` argument correctly.
+ */
+export function evaluateAudienceCondition(
+  condition: AudienceCondition,
+  ctx: AudienceEvaluationContext,
+): boolean {
+  // ── Delegate existing BranchCondition types ─────────────────────────────
+  if (
+    condition.type === "option_selected" ||
+    condition.type === "option_not_selected" ||
+    condition.type === "score_above" ||
+    condition.type === "score_below"
+  ) {
+    return evaluateBranchCondition(condition, ctx.answers, ctx.scoreResult);
+  }
+
+  switch (condition.type) {
+    // ── Lead form field condition ──────────────────────────────────────────
+    case "lead_field_equals": {
+      const raw = ctx.leadData[condition.fieldId];
+      if (raw === undefined || raw === null) return false;
+
+      // Boolean comparison (custom_checkbox fields)
+      if (typeof condition.value === "boolean") {
+        return condition.operator === "eq"
+          ? Boolean(raw) === condition.value
+          : Boolean(raw) !== condition.value;
+      }
+
+      // Numeric comparison (custom_number fields)
+      if (typeof condition.value === "number") {
+        const numRaw = parseFloat(String(raw));
+        if (isNaN(numRaw)) return false;
+        return applyNumericOperator(
+          numRaw,
+          condition.operator as string,
+          condition.value,
+        );
+      }
+
+      // String comparison — case-insensitive
+      const strRaw = String(raw).toLowerCase();
+      const strVal = String(condition.value).toLowerCase();
+      switch (condition.operator) {
+        case "eq":
+          return strRaw === strVal;
+        case "neq":
+          return strRaw !== strVal;
+        case "contains":
+          return strRaw.includes(strVal);
+        case "starts_with":
+          return strRaw.startsWith(strVal);
+        // Numeric operators applied to strings: cast both sides
+        default: {
+          const n = parseFloat(strRaw);
+          const v = parseFloat(strVal);
+          if (isNaN(n) || isNaN(v)) return false;
+          return applyNumericOperator(n, condition.operator, v);
+        }
+      }
+    }
+
+    // ── Category rank condition ────────────────────────────────────────────
+    case "category_rank": {
+      const scores = ctx.scoreResult.categoryScores;
+      if (scores.length === 0) return false;
+
+      if (condition.rank === "highest") {
+        const maxScore = Math.max(...scores.map((c) => c.score));
+        // Ties are inclusive — both tied categories qualify as "highest"
+        return scores.some(
+          (c) => c.categoryId === condition.categoryId && c.score === maxScore,
+        );
+      } else {
+        const minScore = Math.min(...scores.map((c) => c.score));
+        return scores.some(
+          (c) => c.categoryId === condition.categoryId && c.score === minScore,
+        );
+      }
+    }
+
+    // ── Category / overall score condition ────────────────────────────────
+    case "category_score": {
+      const { categoryId, metric, operator, value } = condition;
+
+      if (metric === "tier_id") {
+        // tier_id comparison: string eq/neq only
+        const tierId =
+          categoryId === "overall"
+            ? ctx.scoreResult.overallTier?.id
+            : ctx.scoreResult.categoryScores.find(
+                (c) => c.categoryId === categoryId,
+              )?.tier?.id;
+
+        if (tierId === undefined) return false;
+        const strVal = String(value);
+        if (operator === "eq") return tierId === strVal;
+        if (operator === "neq") return tierId !== strVal;
+        // Non-equality operators are meaningless for string tier IDs
+        return false;
+      }
+
+      // Numeric metrics: percentage or earned_points
+      let metricValue: number;
+      if (categoryId === "overall") {
+        metricValue =
+          metric === "percentage"
+            ? ctx.scoreResult.overallScore
+            : ctx.scoreResult.uncategorizedEarnedPoints; // best available overall points proxy
+      } else {
+        const cat = ctx.scoreResult.categoryScores.find(
+          (c) => c.categoryId === categoryId,
+        );
+        if (!cat) return false;
+        metricValue = metric === "percentage" ? cat.score : cat.earnedPoints;
+      }
+
+      if (typeof value !== "number") return false;
+      return applyNumericOperator(metricValue, operator, value);
+    }
+
+    default:
+      // Exhaustiveness guard — new condition types produce a compile error here
+      return false;
+  }
+}
+
+/**
+ * Applies a numeric comparison operator. Extracted as a private helper to
+ * avoid duplicating the switch across lead_field_equals and category_score.
+ */
+function applyNumericOperator(
+  left: number,
+  operator: string,
+  right: number,
+): boolean {
+  switch (operator) {
+    case "gt":
+      return left > right;
+    case "lt":
+      return left < right;
+    case "gte":
+      return left >= right;
+    case "lte":
+      return left <= right;
+    case "eq":
+      return left === right;
+    case "neq":
+      return left !== right;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluates a compound AudiencePredicate, supporting arbitrary nesting.
+ * A `condition` entry is treated as a nested group when it has an `operator`
+ * field and a `conditions` array (i.e. it is itself an AudiencePredicate),
+ * otherwise it is treated as a leaf AudienceCondition.
+ *
+ * Operator semantics:
+ *   AND → every condition in the group must evaluate to true
+ *   OR  → at least one condition must evaluate to true
+ */
+export function evaluateAudiencePredicate(
+  predicate: AudiencePredicate,
+  ctx: AudienceEvaluationContext,
+): boolean {
+  const results = predicate.conditions.map((entry) => {
+    // Distinguish nested AudiencePredicate from leaf AudienceCondition by
+    // checking for the presence of the `operator` + `conditions` shape.
+    if (
+      typeof entry === "object" &&
+      "operator" in entry &&
+      "conditions" in entry &&
+      Array.isArray((entry as AudiencePredicate).conditions)
+    ) {
+      return evaluateAudiencePredicate(entry as AudiencePredicate, ctx);
+    }
+    return evaluateAudienceCondition(entry as AudienceCondition, ctx);
+  });
+
+  return predicate.operator === "OR"
+    ? results.some(Boolean)
+    : results.every(Boolean);
+}
+
+/**
+ * Resolves the complete set of audience IDs that the current respondent
+ * matches, given the full post-submission context.
+ *
+ * Called ONCE inside resolveToResult() (store.ts) alongside calculateScores()
+ * and calculateVariables(). The returned Set is stored in Zustand state
+ * (audienceMembership) and consumed by resolveSectionVisibility() during
+ * rendering. Never re-evaluated per-render.
+ *
+ * Returns an empty Set when `audiences` is empty or undefined — rendering
+ * falls back to the "always-visible" default for every section.
+ */
+export function resolveAudienceMembership(
+  audiences: AudienceDefinition[],
+  ctx: AudienceEvaluationContext,
+): Set<string> {
+  const matched = new Set<string>();
+  for (const audience of audiences) {
+    if (evaluateAudiencePredicate(audience.predicate, ctx)) {
+      matched.add(audience.id);
+    }
+  }
+  return matched;
+}
+
+/**
+ * Determines whether a section should be rendered given the respondent's
+ * resolved audience membership.
+ *
+ * Called inside SectionTypeRenderer before the template_id switch. A false
+ * return short-circuits to null without touching the component tree.
+ *
+ * Visibility resolution:
+ *   absent / "always-visible" → true  (zero-regression default)
+ *   "none"                    → false
+ *   "audience-based"          → true if audienceMembership ∩ audienceIds ≠ ∅
+ *                               (OR semantics across the audience list)
+ */
+export function resolveSectionVisibility(
+  section: PageSection,
+  audienceMembership: Set<string>,
+): boolean {
+  const vis = section.visibility;
+
+  // Absent or always-visible: render unconditionally (default for all legacy sections)
+  if (!vis || vis.mode === "always-visible") return true;
+
+  // Explicitly hidden
+  if (vis.mode === "none") return false;
+
+  // Audience-based: render if the lead matches ANY of the listed audiences
+  if (vis.mode === "audience-based") {
+    return vis.audienceIds.some((id) => audienceMembership.has(id));
+  }
+
+  // Exhaustiveness fallback — treat unknown modes as always-visible
+  return true;
+}
 
 /**
  * The default score tier ladder applied to any funnel that doesn't define
@@ -296,7 +590,7 @@ export function computeFunnelScore(
   for (const section of sections) {
     if (section.type !== "quiz") continue;
 
-    const content = section.content as Quiz1Content;
+    const content = section.content as QuizSectionContent;
     const qType = content.questionType;
     const options: QuizOptions[] = content.quizOptions ?? [];
     const rawAnswer = answers[section.id];
@@ -552,7 +846,7 @@ function buildSectionScoreIndex(
   for (const page of schema.pages) {
     for (const section of page.sections) {
       if (section.type !== "quiz") continue;
-      const content = section.content as Quiz1Content;
+      const content = section.content as QuizSectionContent;
       const opts = (content.quizOptions ?? []).map((o) => ({
         id: o.id,
         score: o.score,

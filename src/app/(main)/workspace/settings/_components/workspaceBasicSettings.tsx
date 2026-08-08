@@ -29,8 +29,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import DialogWrapper from "@/wrappers/dialog-wrapper";
 import { SubscriptionPlans } from "@/components/billing/subscription-management";
+import DialogWrapper from "@/components/wrappers/dialog-wrapper";
 
 // ✅ Zod schema for form validation
 const OrgUpdateSchema = z.object({

@@ -67,6 +67,151 @@ export type BranchRule = {
   priority?: number;
 };
 
+// ================================================================
+// SECTION 1.2: AUDIENCE SEGMENTATION TYPES
+// ================================================================
+
+/**
+ * String comparison operators used by lead_field_equals conditions.
+ * Numeric operators apply when the field value can be cast to a number
+ * (e.g. custom_number fields). String operators are always case-insensitive.
+ */
+export type AudienceStringOperator =
+  | "eq" // exact match (case-insensitive for strings)
+  | "neq" // not equal
+  | "contains" // substring match
+  | "starts_with"; // prefix match
+
+export type AudienceNumericOperator =
+  | "gt" // greater than
+  | "lt" // less than
+  | "gte" // greater than or equal
+  | "lte" // less than or equal
+  | "eq" // equal
+  | "neq"; // not equal
+
+/**
+ * A single atomic audience condition. Discriminated on `type`.
+ * Extends the BranchCondition grammar with three new leaf types that cover
+ * lead form data, category rank, and score-based segmentation.
+ *
+ * The existing BranchCondition types (option_selected, option_not_selected,
+ * score_above, score_below) are deliberately re-used inside AudiencePredicate
+ * via the AudienceCondition union — one expression language for both routing
+ * and segmentation, per the platform's single-grammar principle.
+ */
+export type AudienceCondition =
+  // Re-export existing branch conditions so audience predicates can use them.
+  | BranchCondition
+
+  // ── Lead form field condition ────────────────────────────────────────────
+  /**
+   * Matches a value the respondent submitted in the lead capture form.
+   * `fieldId` must match a `LeadFormField.id` in `lead_form.fields`.
+   * Operator semantics:
+   *   - String fields: eq / neq / contains / starts_with (case-insensitive)
+   *   - Numeric fields (custom_number): all operators apply; value is cast
+   *     to float before comparison.
+   *   - Boolean fields (custom_checkbox): use eq/neq with value true/false.
+   */
+  | {
+      type: "lead_field_equals";
+      fieldId: string;
+      operator: AudienceStringOperator | AudienceNumericOperator;
+      value: string | number | boolean;
+    }
+
+  // ── Category rank condition ──────────────────────────────────────────────
+  /**
+   * Matches when a named category holds the highest or lowest score rank
+   * among all categories in the respondent's result. Ties are inclusive —
+   * if two categories share the top score, both are considered "highest".
+   * `categoryId` must match a `QuestionCategory.id` in `questionCategories`.
+   */
+  | {
+      type: "category_rank";
+      rank: "highest" | "lowest";
+      categoryId: string;
+    }
+
+  // ── Category / overall score condition ──────────────────────────────────
+  /**
+   * Matches when a category or overall score satisfies a numeric threshold.
+   * `categoryId: "overall"` evaluates the funnel's overall score.
+   * `metric` determines which value is compared:
+   *   - "percentage"    → CategoryScoreResult.score (0–100 integer)
+   *   - "earned_points" → CategoryScoreResult.earnedPoints (raw points)
+   *   - "tier_id"       → CategoryScoreResult.tier?.id (string; use eq/neq)
+   */
+  | {
+      type: "category_score";
+      categoryId: string; // QuestionCategory.id OR "overall"
+      metric: "percentage" | "earned_points" | "tier_id";
+      operator: AudienceNumericOperator;
+      /**
+       * number for percentage / earned_points comparisons.
+       * string (tier id) for tier_id comparisons.
+       */
+      value: number | string;
+    };
+
+/**
+ * A compound predicate for an audience definition. Supports arbitrary
+ * nesting — a `condition` entry may be either a leaf `AudienceCondition`
+ * or a nested `AudiencePredicate` group. This enables compound logic such
+ * as `(A AND B) OR (C AND D)` without a separate group construct.
+ *
+ * Evaluators must check for the presence of `operator` + `conditions` to
+ * distinguish a nested predicate from a leaf condition at runtime.
+ */
+export type AudiencePredicate = {
+  operator: "AND" | "OR";
+  /** Each entry is either a leaf AudienceCondition or a nested AudiencePredicate. */
+  conditions: Array<AudienceCondition | AudiencePredicate>;
+};
+
+/**
+ * A named, reusable audience segment definition stored at the funnel root.
+ * Sections reference audiences by ID in their `visibility.audienceIds` array.
+ *
+ * `retroactive` controls whether, when this audience is created or updated,
+ * the platform should re-evaluate all existing lead records against the new
+ * predicate (server-side batch job). Mock phase: represented as a flag only;
+ * no background processing runs in the browser.
+ */
+export type AudienceDefinition = {
+  /** Stable UUID. Referenced by PageSection.visibility.audienceIds. */
+  id: string;
+  /** Operator-facing label shown in the builder UI, e.g. "UK CEOs — Low Score". */
+  name: string;
+  description?: string;
+  predicate: AudiencePredicate;
+  /**
+   * When true, the platform will attempt to re-segment already-collected leads
+   * when this audience definition is saved. No-op in the mock phase.
+   */
+  retroactive: boolean;
+  created_at: string; // ISO 8601
+};
+
+/**
+ * Visibility configuration for a single PageSection.
+ * Absent on sections authored before this feature — treated as "always-visible"
+ * by the renderer, guaranteeing zero visual regression for existing funnels.
+ *
+ * `audienceIds` is only meaningful when `mode === "audience-based"`.
+ * OR semantics: a section renders if the lead matches ANY listed audience.
+ * AND semantics must be modelled within a single audience's predicate.
+ */
+export type SectionVisibility =
+  | { mode: "always-visible" }
+  | { mode: "none" }
+  | {
+      mode: "audience-based";
+      /** Render if the resolved audienceMembership Set contains ANY of these IDs. */
+      audienceIds: string[];
+    };
+
 /**
  * An operator-configurable score range with a label and display color.
  * Assigned to the overall score and to each category score during scoring
@@ -459,7 +604,7 @@ interface FaqSectionContent {
 // template_id: "CTA__SPLIT_RIGHT__DARK__v1_0"
 // Layout: dark card | text (left) + email form (right)
 // ----------------------------------------------------------------
-interface CTAFormSection {
+export interface CTAFormSection {
   heading: string;
   subtext: string;
   form_eyebrow?: string; // e.g., "Stay up to date"
@@ -467,6 +612,14 @@ interface CTAFormSection {
   submit_label: string; // e.g., "Subscribe"
   privacy_notice?: string; // e.g., "By subscribing you agree to our"
   privacy_policy_cta?: CallToAction;
+  /**
+   * Progressive profiling fields for this CTA instance. Reuses the same
+   * `LeadFormField` shape as `lead_form.fields` (Section 4) so field IDs —
+   * e.g. "email", "first_name" — line up with the final lead capture form,
+   * enabling auto-hydration there. When absent, the renderer falls back to
+   * a single legacy `email` field for zero regression on existing content.
+   */
+  fields?: LeadFormField[];
 }
 
 // ----------------------------------------------------------------
@@ -566,6 +719,7 @@ export type QuestionType =
   | "short_text"
   | "long_text"
   | "number"
+  | "number_range" //contains a number range e.g from -> to or current weight -> Goal weight
   | "scale";
 
 // ----------------------------------------------------------------
@@ -951,6 +1105,13 @@ export type PageSection = SectionDefinition & {
     | "detailed_category_results";
   is_visible: boolean;
   config?: SectionConfig;
+  /**
+   * Audience-based visibility gate. When absent, the section is treated as
+   * "always-visible" — zero regression for sections authored before this
+   * feature. Only evaluated after scoring is complete (result pages);
+   * normal/landing pages ignore this field and always render their sections.
+   */
+  visibility?: SectionVisibility;
 };
 
 // ================================================================
@@ -995,14 +1156,8 @@ export interface funnelPayloadSchema {
   title: string; // Internal CMS label — NOT rendered to users
   status: "draft" | "published" | "archived";
   questionCategories: QuestionCategory[];
-  /**
-   * Operator-configurable score tiers shared by the overall score and every
-   * category score (CategoryScoreResult.tier / FunnelScoreResult.overallTier).
-   * Optional — funnels with no explicit value fall back to
-   * DEFAULT_SCORE_TIERS (helpers.ts: 0–33 / 34–66 / 67–100) at scoring time,
-   * mirroring the THEME_DEFAULTS fallback pattern used by the theming system.
-   */
   scoreTiers?: ScoreTier[];
+  audiences?: AudienceDefinition[];
   config?: FunnelConfig;
   theme?: FunnelTheme;
   lead_form?: LeadFormConfig;

@@ -22,7 +22,8 @@ import { sendEmailVerificationEmail } from "../emails/email-verification";
 import { sendDeleteAccountVerificationEmail } from "../emails/delete-account-verification";
 import { sendPasswordResetEmail } from "../emails/password-reset-email";
 import { sendWelcomeEmail } from "../emails/welcome-email";
-import { subscriptions } from "../products";
+import { env } from "@/lib/env";
+//import { subscriptions } from "../products";
 
 // Utility function to safely parse dates
 function safeParseDate(value: string | Date | null | undefined): Date | null {
@@ -79,26 +80,16 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      mapProfileToUser: (profile) => {
-        return {
-          favoriteNumber: Number(profile.public_repos) || 0,
-        };
-      },
     },
     discord: {
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-      mapProfileToUser: () => {
-        return {
-          favoriteNumber: 0,
-        };
-      },
     },
   },
   session: {
     cookieCache: {
       enabled: true,
-      maxAge: 60, // 1 minute
+      maxAge: 30, // 30 sec
     },
   },
   plugins: [
@@ -138,19 +129,13 @@ export const auth = betterAuth({
               slug: "plus", // Custom slug for easy reference in Checkout URL, e.g. /checkout/pro
             },
           ],
-          successUrl: process.env.POLAR_SUCCESS_URL,
+          successUrl: env.POLAR_SUCCESS_URL,
           authenticatedUsersOnly: true,
         }),
         portal(),
         usage(),
         webhooks({
-          secret:
-            process.env.POLAR_WEBHOOK_SECRET ||
-            (() => {
-              throw new Error(
-                "POLAR_WEBHOOK_SECRET environment variable is required"
-              );
-            })(),
+          secret: env.POLAR_WEBHOOK_SECRET,
           // onPayload: async ({ data, type }) => {
           //   if (
           //     type === "subscription.created" ||
@@ -278,6 +263,34 @@ export const auth = betterAuth({
         before: async (userSession, ctx) => {
           const userId = userSession.userId;
           if (!userId) return; // safety
+
+          // Prefer the org the user last actively selected (persisted via
+          // actions/organization.ts#setActiveOrganization) so a new
+          // session/device resumes where they left off, instead of always
+          // defaulting to whichever org they most recently joined.
+          // const currentUser = await db.query.user.findFirst({
+          //   where: eq(userTable.id, userId),
+          //   columns: { lastActiveOrganizationId: true },
+          // });
+
+          // if (currentUser?.lastActiveOrganizationId) {
+          //   const stillMember = await db.query.member.findFirst({
+          //     where: and(
+          //       eq(member.userId, userId),
+          //       eq(member.organizationId, currentUser.lastActiveOrganizationId)
+          //     ),
+          //     columns: { id: true },
+          //   });
+
+          //   if (stillMember) {
+          //     return {
+          //       data: {
+          //         ...userSession,
+          //         activeOrganizationId: currentUser.lastActiveOrganizationId,
+          //       },
+          //     };
+          //   }
+          // }
 
           const membership = await db.query.member.findFirst({
             where: eq(member.userId, userSession.userId),

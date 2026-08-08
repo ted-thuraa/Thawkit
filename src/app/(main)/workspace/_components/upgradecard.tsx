@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SidebarInput } from "@/components/ui/sidebar";
-import DialogWrapper from "@/wrappers/dialog-wrapper";
+import DialogWrapper from "@/components/wrappers/dialog-wrapper";
 
 export function UpgradeCard() {
   return (

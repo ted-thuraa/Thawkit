@@ -9,7 +9,6 @@ export const teamPermissionsEnum = mysqlEnum([
   "manage_billing",
 ] as const);
 
-export const toolTypeEnum = mysqlEnum(["score_quiz", "gpt_wrapper"] as const);
 export const accessTypeEnum = mysqlEnum([
   "full_access",
   "limited_access",
@@ -28,17 +27,7 @@ export const fieldTypeEnum = mysqlEnum([
   "INFO_SCREEN",
   "IMAGE_BUTTON",
 ] as const);
-export const questionTypeEnum = mysqlEnum(["LEAD_FORM", "QUIZ_FORM"] as const);
-export const questionDiaplayPageEnum = mysqlEnum([
-  "L_P",
-  "Q_P",
-  "R_P",
-] as const);
-export const pageTypesEnum = mysqlEnum([
-  "Landing_Page",
-  "Quiz_Page",
-  "Result_Page",
-] as const);
+
 export const pageStatusEnum = mysqlEnum([
   "Draft",
   "Published",
@@ -52,13 +41,6 @@ export const orderTypesEnum = mysqlEnum([
   "random",
 ]);
 
-export const submissionStatusEnum = mysqlEnum([
-  "RECEIVED",
-  "PROCESSING",
-  "COMPLETED",
-  "FAILED",
-  "SPAM",
-] as const);
 export const plansEnum = mysqlEnum([
   "FREE",
   "STANDARD",
@@ -73,17 +55,7 @@ export const deviceTypeEnum = mysqlEnum([
   "MOBILE",
   "TABLET",
 ] as const);
-export const eventTypeEnum = mysqlEnum([
-  "PAGE_VIEW",
-  "BUTTON_CLICK",
-  "FORM_SUBMIT",
-  "QUIZ_START",
-  "QUIZ_COMPLETE",
-  "QUIZ_ABANDON",
-  "SECTION_SCROLL",
-  "EXTERNAL_LINK_CLICK",
-  "CONVERSION",
-] as const);
+
 export const trafficSourceEnum = mysqlEnum([
   "DIRECT",
   "SEARCH_ENGINE",

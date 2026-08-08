@@ -1,4 +1,5 @@
 import {
+  CalcResults,
   funnelPayloadSchema,
   FunnelScoreResult,
   LeadData,
@@ -23,6 +24,7 @@ export function buildPersonalizationContext(
   schema: funnelPayloadSchema | null,
   scoreResult: FunnelScoreResult | null,
   leadData: LeadData,
+  calcResults: CalcResults = {},
 ): PersonalizationContext {
   const questions = new Map<string, QuestionVariable>();
   const categories = new Map<string, CategoryVariable>();
@@ -36,6 +38,7 @@ export function buildPersonalizationContext(
         lowestCategory: null,
         totalQuestions: 0,
       },
+      calc: calcResults,
       lead: leadData,
     };
   }
@@ -80,5 +83,5 @@ export function buildPersonalizationContext(
     totalQuestions: scoreResult.questionScores.length,
   };
 
-  return { questions, categories, global, lead: leadData };
+  return { questions, categories, global, calc: calcResults, lead: leadData };
 }

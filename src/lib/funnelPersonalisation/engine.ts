@@ -140,10 +140,27 @@ function resolveGlobalToken(
   return undefined;
 }
 
+function resolveCalcToken(
+  path: string[],
+  ctx: PersonalizationContext,
+): string | undefined {
+  const [variableId] = path;
+  if (!variableId) return undefined;
+
+  const entry = ctx.calc[variableId];
+  if (!entry) return undefined;
+
+  // By default, {{calc.id}} resolves to the formatted display string.
+  // This handles currency symbols, decimal places, and error fallbacks
+  // exactly as they appear in the visible metrics panel.
+  return entry.formatted;
+}
+
 const RESOLVERS: Record<string, VariableResolver> = {
   question: resolveQuestionToken,
   category: resolveCategoryToken,
   global: resolveGlobalToken,
+  calc: resolveCalcToken,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

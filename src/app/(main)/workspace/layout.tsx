@@ -6,7 +6,7 @@ import {
   createOrganization,
   listOrganizations,
   setActiveOrganization,
-} from "@/actions/organization";
+} from "@/actions/organization.actions";
 
 export default async function Layout({
   children,

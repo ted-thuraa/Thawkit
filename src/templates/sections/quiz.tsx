@@ -242,8 +242,9 @@ function TextQuestion({
   multiLine: boolean;
 }) {
   const setAnswer = useFunnelStore((s) => s.setAnswer);
-  const answers = useFunnelStore((s) => s.answers);
-  const value = (answers[sectionId] as string | undefined) ?? "";
+  const value = useFunnelStore(
+    (s) => (s.answers[sectionId] as string | undefined) ?? "",
+  );
 
   const sharedClass = `
     w-full max-w-2xl rounded-2xl border-2 border-gray-200 p-4 text-base

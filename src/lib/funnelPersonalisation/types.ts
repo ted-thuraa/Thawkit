@@ -1,4 +1,4 @@
-import { LeadData, ScoreTier } from "@/types/PageCMS/pageSchema";
+import { CalcResults, LeadData, ScoreTier } from "@/types/PageCMS/pageSchema";
 
 // ─── Personalization domain model ──────────────────────────────────────────
 //
@@ -46,6 +46,7 @@ export type PersonalizationContext = {
   questions: Map<string, QuestionVariable>;
   categories: Map<string, CategoryVariable>;
   global: GlobalVariables;
+  calc: CalcResults;
   /** Passthrough — preserves the existing bare {{first_name}}-style tokens. */
   lead: LeadData;
 };

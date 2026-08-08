@@ -47,7 +47,7 @@ import {
   SupportedOAuthProvider,
 } from "@/lib/auth/o-auth-providers";
 import { BetterAuthActionButton } from "../auth/better-auth-action-button";
-import { auth } from "@/lib/auth/auth";
+import type { auth } from "@/lib/auth/auth";
 import { authClient } from "@/lib/auth/auth-client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -58,14 +58,12 @@ export function LinkedAccountsTab() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
 
-  // ✅ Fetch linked accounts on mount
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
         setIsLoadingAccounts(true);
         const result = await authClient.listAccounts();
 
-        // ✅ Correctly unwrap typed union
         if ("data" in result && Array.isArray(result.data)) {
           setAccounts(result.data);
         } else if ("error" in result && result.error) {
@@ -127,7 +125,7 @@ export function LinkedAccountsTab() {
             <div className="grid gap-3">
               {SUPPORTED_OAUTH_PROVIDERS.filter(
                 (provider) =>
-                  !currentAccounts.find((acc) => acc.providerId === provider)
+                  !currentAccounts.find((acc) => acc.providerId === provider),
               ).map((provider) => (
                 <AccountCard key={provider} provider={provider} />
               ))}
@@ -175,7 +173,7 @@ function AccountCard({
         onSuccess: () => {
           router.refresh();
         },
-      }
+      },
     );
   }
 

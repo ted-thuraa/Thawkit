@@ -7,8 +7,11 @@ import { useFunnelStore } from "@/stores/funnelStore/store";
 import { funnelPayload } from "@/dummyData/pageData";
 import SectionTypeRenderer from "./sectionRenderer";
 import { LeadFormPage } from "./leadform";
-import { Quiz1Content, MiniResult1Content } from "@/types/PageCMS/pageSchema";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import {
+  MiniResultSectionContent,
+  QuizSectionContent,
+} from "@/types/PageCMS/pageSchema";
 
 // ─── PageProceedButton ────────────────────────────────────────────────────────
 
@@ -107,6 +110,8 @@ function PageProceedButton({
 export function FunnelContainer() {
   const initFunnel = useFunnelStore((s) => s.initFunnel);
   const isReady = useFunnelStore((s) => s.isReady);
+  const currentPageId = useFunnelStore((s) => s.currentPageId);
+  const isOnResultPage = useFunnelStore((s) => s.isOnResultPage);
   const currentPage = useFunnelStore((s) => s.currentPage);
   const progressPercent = useFunnelStore((s) => s.progressPercent);
   const totalSteps = useFunnelStore((s) => s.totalSteps);
@@ -159,7 +164,7 @@ export function FunnelContainer() {
     // so they never gate canProceed. Only quiz sections do.
     if (quizSections.length === 0) return true;
     return quizSections.every((s) => {
-      const content = s.content as Quiz1Content;
+      const content = s.content as QuizSectionContent;
       if (content.questionType === "scale") return true;
       const ans = answers[s.id];
       if (Array.isArray(ans)) return ans.length > 0;
@@ -213,10 +218,10 @@ export function FunnelContainer() {
   // component code.
   const isLast = isLastStep();
   const lastQuizContent = quizSections.at(-1)?.content as
-    | Quiz1Content
+    | QuizSectionContent
     | undefined;
   const lastMiniResultContent = miniResultSections.at(-1)?.content as
-    | MiniResult1Content
+    | MiniResultSectionContent
     | undefined;
   const proceedLabel =
     lastQuizContent?.goForward_cta?.label ??

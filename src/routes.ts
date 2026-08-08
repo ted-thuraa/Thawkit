@@ -16,7 +16,7 @@ export const publicRoutes = [
 
 /**
  * An array of routes that are used for authentication
- * These routes will redirect logged in users to /settings
+ * These routes will redirect logged in users to the default post-login page
  * @type {string[]}
  */
 export const authRoutes = [
@@ -33,6 +33,12 @@ export const authRoutes = [
  * @type {string}
  */
 export const apiAuthPrefix = "/api/auth";
+
+/**
+ * The route unauthenticated users are sent to when they hit a protected page
+ * @type {string}
+ */
+export const LOGIN_ROUTE = "/login";
 
 /**
  * The default redirect path after logging in

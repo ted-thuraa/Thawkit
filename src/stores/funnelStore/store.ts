@@ -6,7 +6,7 @@ import {
   funnelPayloadSchema,
   FunnelScoreResult,
   PagePayloadSchema,
-  Quiz1Content,
+  QuizSectionContent,
   QuizAnswer,
   LeadData,
   CalcResults,
@@ -17,6 +17,7 @@ import {
   EMPTY_FUNNEL_SCORE_RESULT,
   DEFAULT_SCORE_TIERS,
   calculateVariables,
+  resolveAudienceMembership,
 } from "./helpers";
 import {
   loadProgress,
@@ -50,6 +51,13 @@ type FunnelState = {
    */
   isOnLeadForm: boolean;
   calcResults: CalcResults;
+  /**
+   * The set of audience IDs that the current respondent matches.
+   * Resolved once inside resolveToResult() after scoring completes.
+   * Empty Set until then — sections default to "always-visible" behaviour.
+   * Never persisted to localStorage (derived from answers + leadData + scoreResult).
+   */
+  audienceMembership: Set<string>;
 };
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -99,6 +107,14 @@ type FunnelActions = {
   partialScoreUpTo: (sectionOrder: number) => FunnelScoreResult;
   submitFunnel: () => Promise<void>;
   submitLeadForm: (data: LeadData) => Promise<void>;
+  /**
+   * Progressive profiling: merges a partial LeadData payload into the
+   * existing store slice. Never replaces the object outright — safe to call
+   * from any mid-funnel CTA that only renders a subset of possible fields.
+   * undefined/null values are dropped so an un-rendered field can never
+   * accidentally null out data captured by an earlier CTA instance.
+   */
+  updateLeadData: (data: Partial<LeadData>) => void;
   skipLeadForm: () => Promise<void>;
 };
 
@@ -121,8 +137,16 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
         await new Promise<void>((resolve) => setTimeout(resolve, 1_500));
 
         const scoreResult = get().calculateScores();
-        const { schema, answers } = get();
+        const { schema, answers, leadData } = get();
         const calcResults = schema ? calculateVariables(schema, answers) : {};
+
+        // ── Audience membership resolution ────────────────────────────────
+        // Evaluated once here, stored in state, consumed by SectionTypeRenderer
+        // via resolveSectionVisibility(). Never re-evaluated per-render.
+        const audienceMembership = resolveAudienceMembership(
+          schema?.audiences ?? [],
+          { answers, leadData, scoreResult },
+        );
 
         const resultPage = get().resultPage();
 
@@ -130,6 +154,7 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
           finalScore: scoreResult.overallScore,
           scoreResult,
           calcResults,
+          audienceMembership,
           isCalculating: false,
           isOnResultPage: true,
           isOnLeadForm: false,
@@ -185,6 +210,7 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
         isOnResultPage: false,
         isOnLeadForm: false,
         calcResults: {},
+        audienceMembership: new Set<string>(),
 
         // ── initFunnel ─────────────────────────────────────────────────────────
         /**
@@ -209,54 +235,63 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
          *     the user was on a step URL with no recoverable progress.
          */
         initFunnel: (schema) => {
-          //const saved = loadProgress(schema.id);
+          const saved = loadProgress(schema.id);
 
-          // ── Branch A: funnel was previously completed ──────────────────────
-          // if (saved?.isCompleted) {
-          //   set({
-          //     schema,
-          //     currentPageId: null, // result page has no currentPageId
-          //     navigationHistory: saved.navigationHistory,
-          //     answers: saved.answers,
-          //     leadData: {},
-          //     isReady: true,
-          //     isCalculating: false,
-          //     finalScore: null,
-          //     scoreResult: null,
-          //     isOnResultPage: true,
-          //     isOnLeadForm: false,
-          //   });
-          // Re-derive scores from saved answers (same deterministic algorithm
-          // as the original submission — no stale cache needed).
-          //   const scores = get().calculateScores();
-          //   set({ finalScore: scores.overallScore, scoreResult: scores });
-          //   return;
-          // }
+          //── Branch A: funnel was previously completed ──────────────────────
+          if (saved?.isCompleted) {
+            set({
+              schema,
+              currentPageId: null, // result page has no currentPageId
+              navigationHistory: saved.navigationHistory,
+              answers: saved.answers,
+              leadData: {},
+              isReady: true,
+              isCalculating: false,
+              finalScore: null,
+              scoreResult: null,
+              isOnResultPage: true,
+              isOnLeadForm: false,
+              calcResults: {},
+              audienceMembership: new Set<string>(),
+            });
+            //Re-derive scores from saved answers (same deterministic algorithm
+            //as the original submission — no stale cache needed).
+            const scores = get().calculateScores();
+            const calcResults = calculateVariables(schema, saved.answers);
+            set({
+              finalScore: scores.overallScore,
+              scoreResult: scores,
+              calcResults,
+            });
+            return;
+          }
 
           // ── Branch B: valid in-progress step ──────────────────────────────
-          // const savedPageIsValid =
-          //   saved !== null &&
-          //   schema.pages.some(
-          //     (p) =>
-          //       p.id === saved.currentPageId && p.pageType !== "result_page",
-          //   );
+          const savedPageIsValid =
+            saved !== null &&
+            schema.pages.some(
+              (p) =>
+                p.id === saved.currentPageId && p.pageType !== "result_page",
+            );
 
-          // if (savedPageIsValid) {
-          //   set({
-          //     schema,
-          //     currentPageId: saved!.currentPageId,
-          //     navigationHistory: saved!.navigationHistory,
-          //     answers: saved!.answers,
-          //     leadData: {},
-          //     isReady: true,
-          //     isCalculating: false,
-          //     finalScore: null,
-          //     scoreResult: null,
-          //     isOnResultPage: false,
-          //     isOnLeadForm: false,
-          //   });
-          //   return;
-          // }
+          if (savedPageIsValid) {
+            set({
+              schema,
+              currentPageId: saved!.currentPageId,
+              navigationHistory: saved!.navigationHistory,
+              answers: saved!.answers,
+              leadData: {},
+              isReady: true,
+              isCalculating: false,
+              finalScore: null,
+              scoreResult: null,
+              isOnResultPage: false,
+              isOnLeadForm: false,
+              calcResults: {},
+              audienceMembership: new Set<string>(),
+            });
+            return;
+          }
 
           // console.log("here");
           // ── Branch C: no valid progress — start from first page ────────────
@@ -284,6 +319,7 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
             isOnResultPage: false,
             isOnLeadForm: false,
             calcResults: {},
+            audienceMembership: new Set<string>(),
           });
         },
 
@@ -320,6 +356,7 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
             isOnResultPage: false,
             isOnLeadForm: false,
             calcResults: {},
+            audienceMembership: new Set<string>(),
           });
         },
 
@@ -460,7 +497,7 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
 
           for (const section of page.sections) {
             if (section.type !== "quiz") continue;
-            const content = section.content as Quiz1Content;
+            const content = section.content as QuizSectionContent;
 
             // ── Priority 1: section-level compound rules ─────────────────────
             // NOTE: no `scores` argument is passed here, so score_above /
@@ -485,19 +522,25 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
             }
 
             // ── Priority 2: option-level branch targets ───────────────────────
-            const selectedIds =
-              (answers[section.id] as string[] | undefined) ?? [];
-            for (const selectedId of selectedIds) {
-              const option = content.quizOptions?.find(
-                (o) => o.id === selectedId,
-              );
-              if (!option?.branchTarget) continue;
-              if (option.branchTarget.type === "external_redirect") {
-                if (typeof window !== "undefined")
-                  window.location.href = option.branchTarget.url;
-                return null;
+            // Only choice questions support option-level branching.
+            if (
+              content.questionType === "single_choice" ||
+              content.questionType === "multiple_choice"
+            ) {
+              const selectedIds =
+                (answers[section.id] as string[] | undefined) ?? [];
+              for (const selectedId of selectedIds) {
+                const option = content.quizOptions?.find(
+                  (o) => o.id === selectedId,
+                );
+                if (!option?.branchTarget) continue;
+                if (option.branchTarget.type === "external_redirect") {
+                  if (typeof window !== "undefined")
+                    window.location.href = option.branchTarget.url;
+                  return null;
+                }
+                return option.branchTarget.pageId;
               }
-              return option.branchTarget.pageId;
             }
           }
 
@@ -563,9 +606,20 @@ export const useFunnelStore = create<FunnelState & FunnelActions>()(
 
           await resolveToResult();
         },
+        updateLeadData: (data) => {
+          const current = get().leadData;
+          const cleaned: LeadData = {};
+          Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              cleaned[key] = value;
+            }
+          });
+          // Merge — never replace. Existing keys not present in `data` are preserved.
+          set({ leadData: { ...current, ...cleaned } });
+        },
 
         submitLeadForm: async (data: LeadData) => {
-          set({ leadData: data });
+          set({ leadData: { ...get().leadData, ...data } });
           await resolveToResult();
         },
 

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth/auth-client";
 import { useRouter } from "next/navigation";
 import { SignUpTab } from "./_components/sign-up-tab";
+import { DEFAULT_LOGIN_REDIRECT } from "@/routes";
 
 type Tab = "signin" | "signup" | "email-verification" | "forgot-password";
 
@@ -23,7 +24,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     authClient.getSession().then((session) => {
-      if (session.data != null) router.push("/");
+      if (session.data != null) router.push(DEFAULT_LOGIN_REDIRECT);
     });
   }, [router]);
 
@@ -31,6 +32,11 @@ export default function SignUpPage() {
     //Todo: send to email verification page
     setEmail(email);
     setSelectedTab("email-verification");
+  }
+  function openForgotPassword() {
+    //Todo: openForgotPassword page
+    //setEmail(email);
+    //setSelectedTab("email-verification");
   }
 
   return (
@@ -41,7 +47,10 @@ export default function SignUpPage() {
             <CardTitle>Sign Up</CardTitle>
           </CardHeader>
           <CardContent>
-            <SignUpTab openEmailVerificationTab={openEmailVerificationTab} />
+            <SignUpTab
+              openEmailVerificationTab={openEmailVerificationTab}
+              openForgotPassword={openForgotPassword}
+            />
           </CardContent>
 
           <Separator />

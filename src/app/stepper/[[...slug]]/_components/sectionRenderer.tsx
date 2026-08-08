@@ -46,10 +46,8 @@
 import React from "react";
 
 import { PageSection } from "@/types/PageCMS/pageSchema";
-
-// Section component imports — one per template_id.
-// Grouped by category to mirror the SectionDefinition union structure.
-import { Navbar1 } from "@/templates/sections/nav";
+import { useFunnelStore } from "@/stores/funnelStore/store";
+import { resolveSectionVisibility } from "@/stores/funnelStore/helpers";
 import { Hero1 } from "@/templates/sections/hero";
 import { Stats1 } from "@/templates/sections/stats";
 import { Features1 } from "@/templates/sections/features";
@@ -76,11 +74,30 @@ type Props = {
  * The switch exhausts every member of `SectionDefinition`. Adding a new
  * `template_id` to the union in pageSchema.ts without adding a `case` here
  * causes a TypeScript compile error at the `assertNever` call in `default`.
+ *
+ * ── Audience visibility gate ─────────────────────────────────────────────────
+ * Before dispatching to a component, resolveSectionVisibility() checks the
+ * section's optional `visibility` field against the store's audienceMembership
+ * Set. Sections with no `visibility` field, or with mode "always-visible",
+ * pass through unconditionally — zero regression for existing sections.
+ * Sections with mode "none" are always hidden. Sections with mode
+ * "audience-based" render only when the respondent matches at least one of
+ * the listed audience IDs (OR semantics).
  */
 const SectionTypeRenderer = ({
   section,
   pageId,
 }: Props): React.ReactElement | null => {
+  // Audience membership is resolved once in resolveToResult() (store.ts) and
+  // stored as a stable Set. Reading it here is a cheap selector call — the
+  // Set reference only changes when a new funnel submission completes.
+  const audienceMembership = useFunnelStore((s) => s.audienceMembership);
+
+  // Visibility gate — short-circuits to null before any component is touched.
+  if (!resolveSectionVisibility(section, audienceMembership)) {
+    return null;
+  }
+
   switch (section.template_id) {
     // ── HEADER ───────────────────────────────────────────────────────────────
     case "HEADER__STICKY_TOP__LIGHT__v1_0":

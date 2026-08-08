@@ -16,6 +16,7 @@ import {
   ScoreTier,
 } from "@/types/PageCMS/pageSchema";
 import { PageSection } from "@/types/PageCMS/pageSchema";
+import { ScoreDonutChart } from "../TemplateComponents/Charts/ScoreDonutChart";
 
 type Props = {
   section: PageSection;
@@ -370,6 +371,7 @@ export function ResultPage({ section }: Props) {
   const calcResults = useFunnelStore((s) => s.calcResults);
   const initFunnel = useFunnelStore((s) => s.initFunnel);
   const schema = useFunnelStore((s) => s.schema);
+  const retakeFunnel = useFunnelStore((s) => s.retakeFunnel);
 
   // Shared personalization context — same instance the new
   // DetailedCategoryResults section uses, built once per page render.
@@ -414,7 +416,7 @@ export function ResultPage({ section }: Props) {
   })();
 
   const handleRetake = () => {
-    if (schema) initFunnel(schema);
+    retakeFunnel();
   };
 
   return (
@@ -435,7 +437,12 @@ export function ResultPage({ section }: Props) {
 
       {/* ── Overall score dial + tier label ── */}
       <div className="flex flex-col items-center gap-3">
-        <ScoreDial score={overallScore} />
+        to do pie chart
+        {/* <ScoreDonutChart
+          categories={categoryScores}
+          overallScore={overallScore}
+          overallTier={overallTier}
+        /> */}
         <TierBadge tier={overallTier} />
       </div>
 
@@ -483,12 +490,12 @@ export function ResultPage({ section }: Props) {
                   "var(--tk-font-heading-weight)" as React.CSSProperties["fontWeight"],
               }}
             >
-              {content.heading}
+              {interpolateTemplate(content.heading, personalizationCtx)}
             </h2>
           )}
           {content.subtext && (
             <p className="text-sm" style={{ color: "var(--tk-text-body)" }}>
-              {content.subtext}
+              {interpolateTemplate(content.subtext, personalizationCtx)}
             </p>
           )}
         </div>

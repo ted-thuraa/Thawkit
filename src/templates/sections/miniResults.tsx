@@ -3,7 +3,10 @@
 import React, { useMemo } from "react";
 import { useFunnelStore } from "@/stores/funnelStore/store";
 import { resolveBracket } from "@/stores/funnelStore/helpers";
-import { MiniResult1Content, PageSection } from "@/types/PageCMS/pageSchema";
+import {
+  MiniResultSectionContent,
+  PageSection,
+} from "@/types/PageCMS/pageSchema";
 
 type Props = {
   section: PageSection;
@@ -31,7 +34,7 @@ type Props = {
  * for funnelContainer's quiz-detection logic to key off of.
  */
 export const MiniResult1 = ({ section }: Props) => {
-  const content = section.content as MiniResult1Content;
+  const content = section.content as MiniResultSectionContent;
 
   const answers = useFunnelStore((s) => s.answers);
   const partialScoreUpTo = useFunnelStore((s) => s.partialScoreUpTo);
