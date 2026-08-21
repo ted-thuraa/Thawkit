@@ -214,22 +214,17 @@ export type SectionVisibility =
 
 /**
  * An operator-configurable score range with a label and display color.
- * Assigned to the overall score and to each category score during scoring
- * (see resolveScoreTier() / computeFunnelScore() in helpers.ts).
+ * ...
  *
- * Ranges are defined inclusive on both ends and are expected to be
- * contiguous and non-overlapping across 0–100 (e.g. 0–33 / 34–66 / 67–100),
- * though resolveScoreTier() degrades gracefully — nearest-tier fallback —
- * if a funnel's authored tiers leave a gap, so a score is never left
- * unlabeled in production even from a malformed config.
- *
- * Cardinality (content-authoring constraint, not yet enforced at runtime —
- * the visual funnel builder, architecture roadmap Module 3, is the natural
- * place to validate this once it exists): every funnel has at least 1 tier
- * (a single 0–100 band) and at most 10 (e.g. ten 10-point bands).
- *
- * `color` must be a 6-digit hex string (e.g. "#22c55e") — TierBadge in
- * result.tsx appends an alpha suffix to it directly for the tint background.
+ * Tier COUNT and BOUNDARIES are entirely author-controlled — a funnel may
+ * define 1 tier or 10, with any width split (even, asymmetric, whatever the
+ * operator wants). The one invariant that holds across the WHOLE set (never
+ * per-tier) is that the lowest tier's score_from is 0 and the highest tier's
+ * score_to is 100 — collectively the tiers must cover the entire 0–100
+ * range. See validateScoreTierCoverage() in helpers.ts for an authoring-time
+ * check of this invariant (non-blocking — resolveScoreTier() degrades
+ * gracefully even against a malformed ladder).
+ * ...
  */
 export type ScoreTier = {
   id: string;
@@ -450,6 +445,63 @@ interface LogoConfig {
 }
 
 // ================================================================
+// SECTION 1.6: DYNAMIC (SCORE-TIER) CONTENT SYSTEM
+// ================================================================
+//
+// Feature: "Dynamic Content Delivery on Result Pages"
+//
+// Lets a section author N text variations — one per configured ScoreTier —
+// and have the public runner pick the correct one for the respondent at
+// render time, based on either the overall score or a specific category's
+// score. Prerequisite ("dynamic content only available if scoreTiers have
+// been defined") is enforced structurally: resolveDynamicSourceTier() (see
+// helpers.ts) can only ever return a tier that actually exists in
+// `funnelPayloadSchema.scoreTiers` — an empty tier list means every
+// resolution call falls through to the section's own static/base content,
+// with zero extra guard code required.
+//
+// Authoring model (mirrors the already-established
+// DetailedCategoryResultsSectionContent.categoryContent + fallbackTemplate
+// pattern — a Record keyed by a stable schema id, with the section's own
+// base fields acting as the fallback):
+//   - The section's normal top-level text fields (e.g. ContentSection.heading)
+//     are the DEFAULT — what renders when `isDynamic` is false, AND what a
+//     tier renders when it has no explicit entry in `variantsByTier` (a
+//     content-drift safety net, e.g. a tier added after this section was
+//     last authored).
+//   - `variantsByTier[tier.id]` is a PARTIAL override — only fields the
+//     operator actually authored for that tier are swapped in; every
+//     omitted field falls back to the section's base value.
+
+/** What score drives variant selection for a dynamic-content section. */
+export type DynamicContentSource =
+  | { type: "overall" }
+  | { type: "category"; categoryId: string }; // QuestionCategory.id
+
+/**
+ * Section-level dynamic content configuration + variant storage.
+ *
+ * `T` is the text-bearing subset of the section's own content shape that
+ * participates in variation — e.g. `Pick<ContentSection, "heading" |
+ * "subtext" | "eyebrow">`. Generic so any future text-content template can
+ * opt in by embedding this same config shape, without a new resolver.
+ */
+export interface DynamicContentConfig<T extends Record<string, unknown>> {
+  isDynamic: boolean;
+  /** Meaningful only when isDynamic is true. Defaults to overall score. */
+  source: DynamicContentSource;
+  /**
+   * Builder-only bookkeeping — which tier the operator is currently
+   * authoring in the "You are currently editing" selector. Never read by
+   * the public runner; purely a canvas-state convenience for a future
+   * builder UI (architecture roadmap Module 3).
+   */
+  editingTierId?: string;
+  /** Keyed by ScoreTier.id. Each value is a PARTIAL override of `T`. */
+  variantsByTier: Record<string, Partial<T>>;
+}
+
+// ================================================================
 // SECTION 2: SECTION-LEVEL CONFIGURATION
 // ================================================================
 
@@ -620,6 +672,24 @@ export interface CTAFormSection {
    * a single legacy `email` field for zero regression on existing content.
    */
   fields?: LeadFormField[];
+}
+
+// ----------------------------------------------------------------
+// template_id: "CONTENT_LEFT_ALLIGNED_v1"
+// Layout: left-aligned eyebrow + heading + subtext content block
+// ----------------------------------------------------------------
+export interface ContentSection {
+  heading: string;
+  subtext: string;
+  eyebrow?: string;
+  /**
+   * Score-tier Dynamic Content (Section 1.6). Absent → this section always
+   * renders the static heading/subtext/eyebrow above, unconditionally —
+   * zero regression for every section authored before this feature.
+   */
+  dynamicContent?: DynamicContentConfig<
+    Pick<ContentSection, "heading" | "subtext" | "eyebrow">
+  >;
 }
 
 // ----------------------------------------------------------------
@@ -946,7 +1016,7 @@ export interface CalcVariable {
   /** Optional: explains the formula intent to operators. */
   description?: string;
   /**
-   * Read-only friendly formula string for builder UI display — e.g. "MAU × ARPU × 12".
+   * Read-only friendly formula string for builder UI display — e.g. "MAU × ARPU".
    * The evaluation engine never reads this field.
    */
   display_formula?: string;
@@ -1022,12 +1092,20 @@ export type CalcResults = Record<string, CalcResultEntry>;
 type SectionDefinition =
   // ── Nav ──────────────────────────────────────────────────────────────────
   | {
-      template_id: "HEADER__STICKY_TOP__LIGHT__v1_0";
+      template_id: "HEADER__STICKY_TOP__v1";
+      content: NavSectionContent;
+    }
+  | {
+      template_id: "HEADER__STICKY_TOP__v2";
       content: NavSectionContent;
     }
   // ── Hero ─────────────────────────────────────────────────────────────────
   | {
-      template_id: "HERO__SPLIT_LEFT__LIGHT__v1_0";
+      template_id: "HERO__SPLIT_LEFT__v1";
+      content: HeroSectionContent;
+    }
+  | {
+      template_id: "HERO__CENTERED__v1";
       content: HeroSectionContent;
     }
   | {
@@ -1057,6 +1135,10 @@ type SectionDefinition =
   | {
       template_id: "CTA__SPLIT_RIGHT__DARK__v1_0";
       content: CTAFormSection;
+    }
+  | {
+      template_id: "CONTENT_LEFT_ALLIGNED_v1";
+      content: ContentSection;
     }
   // ── Quiz ──────────────────────────────────────────────────────────────────
   | {

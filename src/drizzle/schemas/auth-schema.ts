@@ -1,3 +1,5 @@
+// path: src/drizzle/schemas/auth-schema.ts
+
 import {
   mysqlTable,
   text,
@@ -5,6 +7,9 @@ import {
   boolean,
   int,
   varchar,
+  mysqlEnum,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 export const user = mysqlTable("user", {
@@ -100,41 +105,86 @@ export const passkey = mysqlTable("passkey", {
   aaguid: varchar("aaguid", { length: 255 }),
 });
 
+// ADDED: required by the /workspace bootstrapping sequence to short-circuit
+// suspended/billing-lapsed workspaces before rendering the dashboard.
+export const organizationStatusValues = [
+  "active",
+  "suspended",
+  "trial_expired",
+] as const;
+export type OrganizationStatusValue = (typeof organizationStatusValues)[number];
+
 export const organization = mysqlTable("organization", {
   id: varchar("id", { length: 255 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).unique(),
-  // ownerId: varchar("ownerId", { length: 255 }).unique().notNull(),
   logo: varchar("logo", { length: 255 }),
   createdAt: timestamp("created_at").notNull(),
   metadata: text("metadata"),
+  status: mysqlEnum("status", organizationStatusValues)
+    .default("active")
+    .notNull(),
 });
 
-export const member = mysqlTable("member", {
-  id: varchar("id", { length: 255 }).primaryKey(),
-  organizationId: varchar("organization_id", { length: 255 })
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  userId: varchar("user_id", { length: 255 })
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  role: varchar("role", { length: 255 }).default("member").notNull(),
-  createdAt: timestamp("created_at").notNull(),
-});
+export const member = mysqlTable(
+  "member",
+  {
+    id: varchar("id", { length: 255 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 255 })
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 255 }).default("member").notNull(),
+    // ADDED: org-scoped display name override, edited via Team settings
+    // without mutating the global `user.name` (shared across every org a
+    // user belongs to).
+    displayName: varchar("display_name", { length: 255 }),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => ({
+    // ADDED: one membership row per (org, user), and the primary lookup
+    // path for requireOrgPermission() — hit on nearly every workspace request.
+    orgUserUniqueIdx: uniqueIndex("member_org_user_unique_idx").on(
+      table.organizationId,
+      table.userId,
+    ),
+  }),
+);
 
-export const invitation = mysqlTable("invitation", {
-  id: varchar("id", { length: 255 }).primaryKey(),
-  organizationId: varchar("organization_id", { length: 255 })
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  email: varchar("email", { length: 255 }).notNull(),
-  role: varchar("role", { length: 255 }),
-  status: varchar("status", { length: 255 }).default("pending").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  inviterId: varchar("inviter_id", { length: 255 })
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-});
+export const invitation = mysqlTable(
+  "invitation",
+  {
+    id: varchar("id", { length: 255 }).primaryKey(),
+    organizationId: varchar("organization_id", { length: 255 })
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    role: varchar("role", { length: 255 }),
+    status: varchar("status", { length: 255 }).default("pending").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    inviterId: varchar("inviter_id", { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    // ADDED: prevents duplicate outstanding invites to the same email in an
+    // org. NOTE: this is table-wide, not filtered to status="pending" —
+    // MySQL has no partial/filtered unique indexes. `revokeInvitation`
+    // (actions/workspace/team.ts) compensates by hard-deleting canceled
+    // rows rather than leaving them around to block re-invites.
+    orgEmailUniqueIdx: uniqueIndex("invitation_org_email_unique_idx").on(
+      table.organizationId,
+      table.email,
+    ),
+    // ADDED: serves the "pending invites" split view query.
+    orgStatusIdx: index("invitation_org_status_idx").on(
+      table.organizationId,
+      table.status,
+    ),
+  }),
+);
 
 export const subscription = mysqlTable("subscription", {
   id: varchar("id", { length: 255 }).primaryKey(),
@@ -160,8 +210,8 @@ export const subscription = mysqlTable("subscription", {
   customerCancellationReason: text("customer_cancellation_reason"),
   customerCancellationComment: text("customer_cancellation_comment"),
 
-  metadata: text("metadata"), // JSON string
-  customFieldData: text("custom_field_data"), // JSON string
+  metadata: text("metadata"),
+  customFieldData: text("custom_field_data"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   modifiedAt: timestamp("modified_at")

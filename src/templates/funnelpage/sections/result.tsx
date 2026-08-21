@@ -16,10 +16,18 @@ import {
   ScoreTier,
 } from "@/types/PageCMS/pageSchema";
 import { PageSection } from "@/types/PageCMS/pageSchema";
-import { ScoreDonutChart } from "../TemplateComponents/Charts/ScoreDonutChart";
+import { ScoreDonutChart } from "../../TemplateComponents/Charts/ScoreDonutChart";
+import Image from "next/image";
+import GaugeChart from "../components/charts/gaugeChart";
+import FunnelResultScoreGaugeChart from "../components/charts/gaugeChart";
+import {
+  FunnelButton,
+  FunnelButtonContainer,
+} from "../components/FunnelButton";
 
 type Props = {
   section: PageSection;
+  pageId: string;
 };
 
 type RenderContext = {
@@ -364,7 +372,7 @@ function CalcResultsPanel({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function ResultPage({ section }: Props) {
+export function ResultPage({ section, pageId }: Props) {
   // Prefer the rich scoreResult; fall back to bare finalScore for backwards compat
   const scoreResult = useFunnelStore((s) => s.scoreResult);
   const finalScore = useFunnelStore((s) => s.finalScore);
@@ -527,5 +535,248 @@ export function ResultPage({ section }: Props) {
         </button>
       </div>
     </div>
+  );
+}
+
+export function ResultSection_v1({ section, pageId }: Props) {
+  // Prefer the rich scoreResult; fall back to bare finalScore for backwards compat
+  const scoreResult = useFunnelStore((s) => s.scoreResult);
+  const finalScore = useFunnelStore((s) => s.finalScore);
+  const schema = useFunnelStore((s) => s.schema);
+  const retakeFunnel = useFunnelStore((s) => s.retakeFunnel);
+
+  // Shared personalization context — same instance the
+  // DetailedCategoryResults section uses, built once per page render.
+  const personalizationCtx = usePersonalizationContext();
+
+  const content = section.content as ResultOverviewSectionContent;
+
+  const overallScore = scoreResult?.overallScore ?? finalScore ?? 0;
+
+  // ── Gauge arc bands ─────────────────────────────────────────────────────
+  // Derived from the funnel's own configured score tiers (or the shared
+  // DEFAULT_SCORE_TIERS fallback) so the gauge's color bands always match
+  // the same tier ladder driving TierBadge/CategoryScoreBar elsewhere on
+  // this page — single source of truth, no hardcoded thresholds here.
+  const scoreTiers = schema?.scoreTiers ?? [];
+  const gaugeArcsData = [...scoreTiers]
+    .sort((a, b) => a.score_to - b.score_to)
+    .map((tier, i, arr) => ({
+      limit: tier.score_to,
+      color: tier.color,
+      showTick: i === arr.length - 1,
+      label: tier.label,
+    }));
+
+  // ── Welcome message interpolation ──────────────────────────────────────
+  const welcomeMessage = (() => {
+    if (!content.welcome_message) return null;
+    const interpolated = interpolateTemplate(
+      content.welcome_message,
+      personalizationCtx,
+    );
+    return isFullyResolved(interpolated) ? interpolated : null;
+  })();
+
+  const handleRetake = () => {
+    retakeFunnel();
+  };
+
+  return (
+    <section id="result-gauge" className="grid grid-cols-1 items-center">
+      <div className="mx-auto w-full max-w-276 lg:min-w-5xl xl:min-w-276 p-[0.5px]">
+        <div className="*:p-[0.5px]  relative">
+          <div className="relative grid gap-px overflow-hidden">
+            {(content.heading || content.subtext) && (
+              <div
+                className="relative z-10 p-6 @4xl:px-8 @4xl:pt-20 @4xl:pb-14"
+                data-grid-content="true"
+              >
+                <p className="inline-flex items-center gap-px text-xs tracking-widest text-muted-foreground mb-4">
+                  <span
+                    aria-hidden="true"
+                    className="font-mono text-muted-foreground/50"
+                  >
+                    [
+                  </span>
+                  agentic shopping
+                  <span
+                    aria-hidden="true"
+                    className="font-mono text-muted-foreground/50"
+                  >
+                    ]
+                  </span>
+                </p>
+                <h2
+                  className="mb-4 max-w-3xl text-pretty font-medium text-2xl leading-tight lg:text-4xl "
+                  style={{
+                    color: "var(--tk-text-heading)",
+                    fontFamily: "var(--tk-font-heading)",
+                    fontWeight:
+                      "var(--tk-font-heading-weight)" as React.CSSProperties["fontWeight"],
+                  }}
+                >
+                  {interpolateTemplate(content.heading, personalizationCtx)}
+                </h2>
+                {content.subtext && (
+                  <p
+                    className="max-w-3xl text-pretty font-normal text-base  lg:text-lg "
+                    style={{ color: "var(--tk-text-body)" }}
+                  >
+                    {interpolateTemplate(content.subtext, personalizationCtx)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3  gap-px ">
+            {/* ── Gauge visual (replaces static image placeholder) ── */}
+            <div className="md:col-span-2">
+              <div
+                className="h-full w-full flex items-center justify-center  @4xl:p-6 p-4"
+                data-grid-content="true"
+              >
+                <div className="w-full aspect-[2/1] max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg mx-auto">
+                  <FunnelResultScoreGaugeChart
+                    gaugeType="semicircle-default"
+                    overallScoreData={{
+                      score_percentage: String(overallScore),
+                    }}
+                    arcsData={gaugeArcsData}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="md:col-span-1">
+              <div className="grid h-full gap-px">
+                <div className=" @4xl:p-6 p-4" data-grid-content="true">
+                  <div className="flex items-start gap-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="currentColor"
+                      viewBox="0 0 256 256"
+                      className="mt-0.5 size-5 text-gray-600"
+                    >
+                      <path
+                        d="M104,168a40,40,0,1,1-40-40A40,40,0,0,1,104,168Zm88-40a40,40,0,1,0,40,40A40,40,0,0,0,192,128Z"
+                        opacity="0.2"
+                      ></path>
+                      <path d="M237.2,151.87v0a47.1,47.1,0,0,0-2.35-5.45L193.26,51.8a7.82,7.82,0,0,0-1.66-2.44,32,32,0,0,0-45.26,0A8,8,0,0,0,144,55V80H112V55a8,8,0,0,0-2.34-5.66,32,32,0,0,0-45.26,0,7.82,7.82,0,0,0-1.66,2.44L21.15,146.4a47.1,47.1,0,0,0-2.35,5.45v0A48,48,0,1,0,112,168V96h32v72a48,48,0,1,0,93.2-16.13ZM76.71,59.75a16,16,0,0,1,19.29-1v73.51a47.9,47.9,0,0,0-46.79-9.92ZM64,200a32,32,0,1,1,32-32A32,32,0,0,1,64,200ZM160,58.74a16,16,0,0,1,19.29,1l27.5,62.58A47.9,47.9,0,0,0,160,132.25ZM192,200a32,32,0,1,1,32-32A32,32,0,0,1,192,200Z"></path>
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">
+                        Visibility Score
+                      </h4>
+                      <p className="mt-1 text-gray-600 text-sm">
+                        Track responses and ensure your AI outputs are easily
+                        understood.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className=" @4xl:p-6 p-4" data-grid-content="true">
+                  <div className="flex items-start gap-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="currentColor"
+                      viewBox="0 0 256 256"
+                      className="mt-0.5 size-5 text-gray-600"
+                    >
+                      <path
+                        d="M216,48v55.77C216,174.6,176.6,232,128,232S40,174.6,40,103.79V48a8,8,0,0,1,10.89-7.47C66,46.41,95.11,55.71,128,55.71s62-9.3,77.11-15.16A8,8,0,0,1,216,48Z"
+                        opacity="0.2"
+                      ></path>
+                      <path d="M217,34.8a15.94,15.94,0,0,0-14.82-1.71C188.15,38.55,159.82,47.71,128,47.71S67.84,38.55,53.79,33.09A16,16,0,0,0,32,48v55.77c0,35.84,9.65,69.65,27.18,95.18,18.16,26.46,42.6,41,68.82,41s50.66-14.57,68.82-41C214.35,173.44,224,139.63,224,103.79V48A16,16,0,0,0,217,34.8Zm-9,69c0,32.64-8.66,63.23-24.37,86.13C168.54,211.9,148.79,224,128,224s-40.54-12.1-55.63-34.08C56.66,167,48,136.43,48,103.79V48c15.11,5.87,45.58,15.71,80,15.71S192.9,53.87,208,48v55.81Zm-18,18.87A8,8,0,1,1,178,133.33c-2.68-3-8.85-5.33-14-5.33s-11.36,2.34-14,5.33A8,8,0,1,1,138,122.66c5.71-6.38,16.14-10.66,26-10.66S184.25,116.28,190,122.66ZM92,128c-5.19,0-11.36,2.34-14,5.33A8,8,0,1,1,66,122.66C71.75,116.28,82.18,112,92,112s20.25,4.28,26,10.66A8,8,0,1,1,106,133.33C103.36,130.34,97.19,128,92,128Zm76.45,45.19a52.9,52.9,0,0,1-80.9,0A8,8,0,1,1,99.72,162.8a36.89,36.89,0,0,0,56.56,0,8,8,0,0,1,12.17,10.39Z"></path>
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">
+                        Sentiment Analysis
+                      </h4>
+                      <p className="mt-1 text-gray-600 text-sm">
+                        Monitor how responses resonate through emotional tone
+                        and user satisfaction.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className=" @4xl:p-6 p-4" data-grid-content="true">
+                  <div className="flex items-start gap-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="currentColor"
+                      viewBox="0 0 256 256"
+                      className="mt-0.5 size-5 text-gray-600"
+                    >
+                      <path
+                        d="M224,64l-12.16,66.86A16,16,0,0,1,196.1,144H70.55L56,64Z"
+                        opacity="0.2"
+                      ></path>
+                      <path d="M230.14,58.87A8,8,0,0,0,224,56H62.68L56.6,22.57A8,8,0,0,0,48.73,16H24a8,8,0,0,0,0,16h18L67.56,172.29a24,24,0,0,0,5.33,11.27,28,28,0,1,0,44.4,8.44h45.42A27.75,27.75,0,0,0,160,204a28,28,0,1,0,28-28H91.17a8,8,0,0,1-7.87-6.57L80.13,152h116a24,24,0,0,0,23.61-19.71l12.16-66.86A8,8,0,0,0,230.14,58.87ZM104,204a12,12,0,1,1-12-12A12,12,0,0,1,104,204Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,200,204Zm4-74.57A8,8,0,0,1,196.1,136H77.22L65.59,72H214.41Z"></path>
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">
+                        Shopping Data
+                      </h4>
+                      <p className="mt-1 text-gray-600 text-sm">
+                        See when ChatGPT is recommending your brand in the
+                        future of shopping.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className=" @4xl:p-6 p-4" data-grid-content="true">
+                  <div className="flex items-start gap-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="currentColor"
+                      viewBox="0 0 256 256"
+                      className="mt-0.5 size-5 text-gray-600"
+                    >
+                      <path
+                        d="M224,80l-96,56L32,80l96-56Z"
+                        opacity="0.2"
+                      ></path>
+                      <path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"></path>
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">
+                        Entity Tracker
+                      </h4>
+                      <p className="mt-1 text-gray-600 text-sm">
+                        Identify and track brands, products, and competitors
+                        mentioned in AI responses.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <FunnelButtonContainer
+            layout="inline"
+            justify="start"
+            gap="md"
+            className="w-full justify-center items-center"
+          >
+            <FunnelButton
+              variant="unstyled"
+              size="none"
+              analyticsId={`${pageId}-result-retake-cta`}
+              onClick={handleRetake}
+              aria-label={content.retakeCta?.label ?? "Retake Quiz"}
+              className="inline-flex cursor-pointer items-center justify-center whitespace-nowrap font-medium transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 rounded-md focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.99] active:transition-none h-9 px-4 py-2 text-base border border-transparent shadow-black/15 shadow-sm ring-1 ring-foreground/10 duration-200 hover:bg-muted/50 w-full gap-2 bg-white pr-3.5 pl-5 sm:w-auto"
+              style={{
+                backgroundColor: "var(--tk-accent-primary)",
+                color: "var(--tk-accent-primary-fg)",
+                boxShadow: "0 10px 25px -8px var(--tk-accent-primary-border)",
+              }}
+            >
+              {content.retakeCta?.label ?? "Retake Quiz"}
+            </FunnelButton>
+          </FunnelButtonContainer>
+        </div>
+      </div>
+    </section>
   );
 }

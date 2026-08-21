@@ -258,13 +258,14 @@ export function FunnelContainer() {
       {/* ── Page sections ── */}
       <main
         key={activePage.id} // Forces re-mount animation on page change
-        className="max-w-7xl mx-auto px-6 space-y-24 pt-8 animate-fadeIn"
+        className="max-w-7xl mx-auto px-6 space-y-24 pt-20 animate-fadeIn"
       >
         {activePage.sections.map((section) => (
           <SectionTypeRenderer
             key={section.id}
             section={section}
             pageId={activePage.id}
+            pageType={activePage.pageType}
           />
         ))}
       </main>

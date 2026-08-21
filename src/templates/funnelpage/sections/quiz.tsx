@@ -8,6 +8,9 @@ import {
   QuizSectionContent,
   QuizOptions,
 } from "@/types/PageCMS/pageSchema";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type Props = {
   section: PageSection;
@@ -66,7 +69,7 @@ function QuizShell({
   onBack: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center py-16 px-4 gap-10">
+    <div className="flex flex-col items-center py-1 px-4 ">
       {/* Back button */}
       <div className="w-full max-w-2xl">
         <button
@@ -94,10 +97,10 @@ function QuizShell({
       </div>
 
       {/* Heading */}
-      <div className="text-center max-w-2xl space-y-3">
+      <div className="text-center max-w-2xl space-y-3 mb-10">
         <CategoryBadge categoryIds={content.categoryIds ?? []} />
         <h1
-          className="text-4xl md:text-5xl  leading-tight"
+          className="text-pretty text-2xl lg:text-4xl  leading-tight"
           style={{
             color: "var(--tk-text-heading)",
             fontFamily: "var(--tk-font-heading)",
@@ -107,7 +110,10 @@ function QuizShell({
           dangerouslySetInnerHTML={{ __html: content.quizHeading }}
         />
         {content.quizSubtext && (
-          <p className="text-base " style={{ color: "var(--tk-text-body)" }}>
+          <p
+            className="text-base text-pretty lg:text-lg"
+            style={{ color: "var(--tk-text-body)" }}
+          >
             {content.quizSubtext}
           </p>
         )}
@@ -134,42 +140,42 @@ function ChoiceQuestion({
   const answers = useFunnelStore((s) => s.answers);
   const selected = (answers[sectionId] as string[] | undefined) ?? [];
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
-      {(content.quizOptions ?? []).map((option: QuizOptions) => {
-        const isSelected = selected.includes(option.id);
-        return (
-          <button
-            key={option.id}
-            onClick={() => toggleChoice(sectionId, option.id, multi)}
-            aria-pressed={isSelected}
-            className={`
-              group relative flex flex-col gap-2 rounded-2xl border-2 p-6 text-left
-              cursor-pointer transition-all duration-200 outline-none
-              focus-visible:ring-2 focus-visible:ring-offset-2
-              ${
-                isSelected
-                  ? "shadow-md"
-                  : "border-gray-200 bg-white hover:border-gray-400 hover:shadow-sm"
-              }
-            `}
-            style={{
-              ...(isSelected
-                ? {
-                    borderColor: "var(--tk-accent-primary)",
-                    backgroundColor: "var(--tk-accent-primary-bg)",
-                  }
-                : { backgroundColor: "var(--tk-card-bg)" }),
-              // CSS var-based focus ring colour — Tailwind's ring utilities
-              // can't reference dynamic vars directly, so it's set here.
-              ["--tw-ring-color" as string]: "var(--tk-accent-primary)",
-            }}
-          >
-            {option.icon && (
-              <span className="text-2xl leading-none">{option.icon}</span>
-            )}
+  const options = content.quizOptions ?? [];
+  const singleValue = selected[0] ?? "";
+
+  const renderOptionCard = (option: QuizOptions) => {
+    const isSelected = selected.includes(option.id);
+
+    return (
+      <Label
+        key={option.id}
+        htmlFor={option.id}
+        className={`
+          relative flex items-center justify-between gap-4 rounded-xl border-2 p-5
+          cursor-pointer transition-all duration-200 outline-none
+          hover:border-gray-400 hover:shadow-sm
+          has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-2
+        `}
+        style={{
+          borderColor: isSelected
+            ? "var(--tk-accent-primary)"
+            : "var(--tk-border-color, #e5e7eb)",
+          backgroundColor: isSelected
+            ? "var(--tk-accent-primary-bg)"
+            : "var(--tk-card-bg)",
+          ["--tw-ring-color" as string]: "var(--tk-accent-primary)",
+        }}
+      >
+        {/* Content Section (Title, Description, Icon) */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {option.icon && (
+            <span className="size-5 shrink-0 leading-none mt-0.5">
+              {option.icon}
+            </span>
+          )}
+          <div className="flex flex-col gap-1 text-left">
             <span
-              className="font-semibold text-base"
+              className="font-medium text-sm leading-snug"
               style={{
                 color: isSelected
                   ? "var(--tk-accent-primary)"
@@ -180,52 +186,57 @@ function ChoiceQuestion({
             </span>
             {option.description && (
               <span
-                className="text-sm leading-relaxed"
+                className="text-xs leading-relaxed font-normal"
                 style={{ color: "var(--tk-text-body)" }}
               >
                 {option.description}
               </span>
             )}
+          </div>
+        </div>
 
-            {/* Selection indicator — circle for single, checkbox for multi */}
-            <span
-              className={`
-                absolute top-4 right-4 flex h-5 w-5 items-center justify-center
-                transition-all duration-150
-                ${
-                  isSelected
-                    ? multi
-                      ? "rounded-md"
-                      : "rounded-full"
-                    : `border-2 border-gray-300 ${multi ? "rounded-md" : "rounded-full"}`
-                }
-              `}
-              style={
-                isSelected
-                  ? { backgroundColor: "var(--tk-accent-primary)" }
-                  : undefined
-              }
-            >
-              {isSelected && (
-                <svg
-                  className="h-3 w-3 "
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  style={{ color: "var(--tk-accent-primary-fg)" }}
-                >
-                  <path
-                    d="M2 6l3 3 5-5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </span>
-          </button>
-        );
-      })}
+        {/* Selection Primitive (Radio for single, Checkbox for multi) */}
+        {multi ? (
+          <Checkbox
+            id={option.id}
+            checked={isSelected}
+            onCheckedChange={() => toggleChoice(sectionId, option.id, true)}
+            style={{
+              borderColor: isSelected ? "var(--tk-accent-primary)" : undefined,
+              backgroundColor: isSelected
+                ? "var(--tk-accent-primary)"
+                : undefined,
+            }}
+          />
+        ) : (
+          <RadioGroupItem
+            id={option.id}
+            value={option.id}
+            style={{
+              borderColor: isSelected ? "var(--tk-accent-primary)" : undefined,
+              color: isSelected ? "var(--tk-accent-primary)" : undefined,
+            }}
+          />
+        )}
+      </Label>
+    );
+  };
+
+  if (!multi) {
+    return (
+      <RadioGroup
+        value={singleValue}
+        onValueChange={(val) => toggleChoice(sectionId, val, false)}
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl"
+      >
+        {options.map(renderOptionCard)}
+      </RadioGroup>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+      {options.map(renderOptionCard)}
     </div>
   );
 }

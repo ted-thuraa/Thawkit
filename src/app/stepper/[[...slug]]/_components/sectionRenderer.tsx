@@ -45,25 +45,34 @@
 
 import React from "react";
 
-import { PageSection } from "@/types/PageCMS/pageSchema";
+import { PageSection, PageType } from "@/types/PageCMS/pageSchema";
 import { useFunnelStore } from "@/stores/funnelStore/store";
 import { resolveSectionVisibility } from "@/stores/funnelStore/helpers";
-import { Hero1 } from "@/templates/sections/hero";
-import { Stats1 } from "@/templates/sections/stats";
-import { Features1 } from "@/templates/sections/features";
-import { Faq1 } from "@/templates/sections/faq";
-import { Cta1 } from "@/templates/sections/cta";
-import { Quiz1 } from "@/templates/sections/quiz";
-import { ResultPage } from "@/templates/sections/result";
+import {
+  HeroCentered_v1,
+  HeroSplitLeft_v1,
+} from "@/templates/funnelpage/sections/hero";
+import { Stats1 } from "@/templates/funnelpage/sections/stats";
+import { Features1 } from "@/templates/funnelpage/sections/features";
+import { Faq1 } from "@/templates/funnelpage/sections/faq";
+import { Cta1 } from "@/templates/funnelpage/sections/cta";
+import { Quiz1 } from "@/templates/funnelpage/sections/quiz";
+import {
+  ResultPage,
+  ResultSection_v1,
+} from "@/templates/funnelpage/sections/result";
 import { assertNever } from "@/lib/utils/exhaustive";
-import { MiniResult1 } from "@/templates/sections/miniResults";
-import { DetailedCategoryResults } from "@/templates/sections/detailedCategoryResults";
+import { MiniResult1 } from "@/templates/funnelpage/sections/miniResults";
+import { DetailedCategoryResults } from "@/templates/funnelpage/sections/detailedCategoryResults";
+import { Navbar2 } from "@/templates/funnelpage/sections/nav";
+import { ContentLeftAlligned_v1 } from "@/templates/funnelpage/sections/content";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type Props = {
   section: PageSection;
   pageId: string;
+  pageType: string;
 };
 
 // ─── Renderer ─────────────────────────────────────────────────────────────────
@@ -87,6 +96,7 @@ type Props = {
 const SectionTypeRenderer = ({
   section,
   pageId,
+  pageType,
 }: Props): React.ReactElement | null => {
   // Audience membership is resolved once in resolveToResult() (store.ts) and
   // stored as a stable Set. Reading it here is a cheap selector call — the
@@ -100,7 +110,7 @@ const SectionTypeRenderer = ({
 
   switch (section.template_id) {
     // ── HEADER ───────────────────────────────────────────────────────────────
-    case "HEADER__STICKY_TOP__LIGHT__v1_0":
+    case "HEADER__STICKY_TOP__v1":
       // The nav is intentionally rendered at the layout level (funnelContainer
       // or a layout.tsx wrapper) rather than through the section pipeline for
       // landing pages. Quiz and result pages do not include a nav section in
@@ -110,11 +120,19 @@ const SectionTypeRenderer = ({
       //
       // return <Navbar1 section={section} pageId={pageId} />;
       return null;
+    case "HEADER__STICKY_TOP__v2":
+      return <Navbar2 section={section} pageId={pageId} />;
+      return null;
 
     // ── HERO ─────────────────────────────────────────────────────────────────
-    case "HERO__SPLIT_LEFT__LIGHT__v1_0":
+    case "HERO__SPLIT_LEFT__v1":
       // Two-column layout: text left, image right.
-      return <Hero1 section={section} pageId={pageId} />;
+      //return <HeroSplitLeft_v1 section={section} pageId={pageId} />;
+      return <HeroCentered_v1 section={section} pageId={pageId} />;
+
+    case "HERO__CENTERED__v1":
+      // Two-column layout: text left, image right.
+      return <HeroCentered_v1 section={section} pageId={pageId} />;
 
     case "HERO__CENTERED__LIGHT__v1_0":
       // TODO: HeroCentered component not yet implemented.
@@ -145,6 +163,16 @@ const SectionTypeRenderer = ({
     case "CTA__SPLIT_RIGHT__DARK__v1_0":
       // Dark card: descriptive text left, email subscribe form right.
       return <Cta1 section={section} />;
+    // ── CONTENT ───────────────────────────────────────────────────────────────────
+    case "CONTENT_LEFT_ALLIGNED_v1":
+      // Dark card: descriptive text left, email subscribe form right.
+      return (
+        <ContentLeftAlligned_v1
+          section={section}
+          pageId={pageId}
+          pageType={pageType as PageType}
+        />
+      );
 
     // ── QUIZ ──────────────────────────────────────────────────────────────────
     case "QUIZ__SINGLE_STEP__LIGHT__v1_0":
@@ -158,7 +186,8 @@ const SectionTypeRenderer = ({
     // ── RESULT ────────────────────────────────────────────────────────────────
     case "RESULT__SCORE_BREAKDOWN__LIGHT__v1_0":
       // Overall score + per-category breakdown + personalised CTAs.
-      return <ResultPage section={section} />;
+      return <ResultSection_v1 section={section} pageId={pageId} />;
+    //return <ResultPage section={section} />;
     // ── DETAILED CATEGORY RESULTS ───────────────────────────────────────────
     case "DETAILEDCATEGORYRESULTS__CARD_GRID__LIGHT__v1_0":
       // One personalized content card per funnel category.

@@ -1,3 +1,5 @@
+// path: src/drizzle/schemas/relations.ts
+
 // db/schemas/relations.ts
 
 import { relations } from "drizzle-orm";
@@ -12,10 +14,12 @@ export const userRelations = relations(auth.user, ({ many }) => ({
   passkeys: many(auth.passkey),
   members: many(auth.member),
   invitation: many(auth.invitation),
-  // FIX (Phase 1): auth-schema.ts's `subscription` table already declared a
-  // FK to user.id, but no relation entry existed on either side — this
-  // silently blocked `db.query.user.findFirst({ with: { subscriptions: true } })`.
   subscriptions: many(auth.subscription),
+  // ADDED: reverse side of campaignRelations' `creator` — lets
+  // `db.query.user.findFirst({ with: { createdCampaigns: true } })` work.
+  createdCampaigns: many(campaigns.campaigns, {
+    relationName: "campaignCreator",
+  }),
 }));
 
 // ── Session Relations ───────────────────────────────────────────────────────
@@ -60,13 +64,6 @@ export const passkeyRelations = relations(auth.passkey, ({ one }) => ({
 }));
 
 // ── Organization ("Workspace") Relations ────────────────────────────────────
-//
-// `organization` is Better-Auth's table, but it IS ThawKit's Workspace
-// entity per the architecture roadmap (Module 1). Every tenant-owned row in
-// the funnel domain — campaigns and funnels today, and every table Phase 3
-// introduces (pages, submissions, contacts, audiences, etc.) — carries a
-// direct organizationId FK back to this table, per the Phase 2 tenancy
-// hardening pattern (see campaigns-schema.ts).
 export const organizationRelations = relations(
   auth.organization,
   ({ many }) => ({
@@ -75,8 +72,6 @@ export const organizationRelations = relations(
     activeSessions: many(auth.session, {
       relationName: "activeauth.organizationessions",
     }),
-    // ADDED (Phase 2): completes the bidirectional relation now that
-    // campaigns/funnels carry direct organizationId FKs.
     campaigns: many(campaigns.campaigns, {
       relationName: "organizationCampaigns",
     }),
@@ -115,8 +110,6 @@ export const invitationRelations = relations(auth.invitation, ({ one }) => ({
 }));
 
 // ── Subscription Relations ──────────────────────────────────────────────────
-// ADDED (Phase 1): was entirely missing despite auth-schema.ts already
-// defining subscription.userId as a FK to user.id.
 export const subscriptionRelations = relations(
   auth.subscription,
   ({ one }) => ({
@@ -137,6 +130,13 @@ export const campaignRelations = relations(
       references: [auth.organization.id],
       relationName: "organizationCampaigns",
     }),
+    // ADDED: powers `listCampaigns`' `with: { creator: ... }` join used to
+    // populate CampaignDTO.createdBy on the /workspace dashboard.
+    creator: one(auth.user, {
+      fields: [campaigns.campaigns.createdBy],
+      references: [auth.user.id],
+      relationName: "campaignCreator",
+    }),
     funnels: many(campaigns.funnels, {
       relationName: "campaignFunnels",
     }),
@@ -144,10 +144,6 @@ export const campaignRelations = relations(
 );
 
 // ── Funnel Relations ────────────────────────────────────────────────────────
-// ADDED (Phase 2): previously did not exist at all — only the campaign→funnel
-// direction was declared (as `funnel: many(campaigns.funnels)` on
-// campaignRelations), so `db.query.funnels.findFirst({ with: { organization: true } })`
-// had no relation to traverse. Now covers both of funnels' FKs.
 export const funnelRelations = relations(campaigns.funnels, ({ one }) => ({
   organization: one(auth.organization, {
     fields: [campaigns.funnels.organizationId],

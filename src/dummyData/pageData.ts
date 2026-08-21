@@ -44,7 +44,7 @@ export const LandingpagePayload: PagePayloadSchema = {
       order: 0,
       type: "nav",
       is_visible: true,
-      template_id: "HEADER__STICKY_TOP__LIGHT__v1_0",
+      template_id: "HEADER__STICKY_TOP__v2",
       config: {
         background_color: "#ffffff",
         full_bleed: true,
@@ -81,7 +81,7 @@ export const LandingpagePayload: PagePayloadSchema = {
       order: 1,
       type: "hero",
       is_visible: true,
-      template_id: "HERO__SPLIT_LEFT__LIGHT__v1_0",
+      template_id: "HERO__SPLIT_LEFT__v1",
       config: {
         background_color: "#ffffff",
         padding_top: "lg",
@@ -108,255 +108,6 @@ export const LandingpagePayload: PagePayloadSchema = {
           width: 1200,
           height: 1200,
           focal_point: "center",
-        },
-      },
-    },
-
-    {
-      id: "sec_stats_01",
-      order: 2,
-      type: "stats",
-      is_visible: true,
-      template_id: "STATS__GRID_4COL__LIGHT__v1_0",
-      config: {
-        background_color: "#ffffff",
-        padding_top: "md",
-        padding_bottom: "xl",
-      },
-      content: {
-        heading:
-          "We are passionate about empowering individuals and businesses to take control of their finances and achieve their financial goals.",
-        subtext:
-          "We are dedicated to revolutionizing the way individuals and businesses manage their finances. Our team is committed to providing intuitive and innovative solutions that empower our users to achieve financial success.",
-        stats: [
-          {
-            value: "95%",
-            label: "Customer satisfaction rate, reflecting our dedication",
-          },
-          {
-            value: "10+",
-            label: "Innovation and insight to users' financial journeys",
-          },
-          {
-            value: "$10m",
-            label: "Platform has ensuring secure and efficient financial",
-          },
-          {
-            value: "50m",
-            label: "Users worldwide, providing them with financial solutions",
-          },
-        ],
-      },
-    },
-
-    {
-      id: "sec_features_01",
-      order: 3,
-      type: "features",
-      is_visible: true,
-      template_id: "FEATURES__CARD_GRID__LIGHT__v1_0",
-      config: {
-        background_color: "#ffffff",
-        padding_top: "md",
-        padding_bottom: "xl",
-      },
-      content: {
-        heading: "Discover what sets us apart",
-        subtext:
-          "Explore the unique features and advantages that distinguish us from the competition, delivering exceptional value and innovation",
-        features: [
-          {
-            icon_id: "layout_grid",
-            title: "User-Friendly Experience",
-            description:
-              "Designed for simplicity, so you can focus on work, not the tool.",
-          },
-          {
-            icon_id: "link",
-            title: "Flexible & Customizable",
-            description:
-              "Adapts to your workflow with Kanban, List, and Calendar views.",
-          },
-          {
-            icon_id: "users",
-            title: "Seamless Collaboration",
-            description:
-              "Keep your team aligned with shared tasks, real-time updates, and integrations.",
-          },
-          {
-            icon_id: "lock",
-            title: "Secure & Reliable",
-            description:
-              "Data encryption and cloud storage ensure your information is always protected.",
-          },
-          {
-            icon_id: "smartphone",
-            title: "Acquisitions Advisory",
-            description:
-              "Our Acquisitions Advisory service provides expert guidance throughout the entire acquisition process, from initial strategy.",
-          },
-          {
-            icon_id: "shield",
-            title: "Risk Mitigation",
-            description:
-              "Protect your financial assets and investments with our risk mitigation solutions. We identify potential risks, and safeguard your financial future.",
-          },
-          {
-            icon_id: "trending_up",
-            title: "Financial Forecasting",
-            description:
-              "Plan for a secure financial future with Akaunt's financial planning service. Our expert advisors offer personalized financial plans to your goals.",
-          },
-          {
-            icon_id: "file_text",
-            title: "Tax Planning",
-            description:
-              "Our platform helps you track deductible expenses, generate tax reports, and stay compliant with the latest tax regulations.",
-          },
-          {
-            icon_id: "bar_chart",
-            title: "Investment Strategies",
-            description:
-              "We analyze your financial goals, risk tolerance, and market conditions to develop a personalized investment plan.",
-          },
-        ],
-      },
-    },
-
-    {
-      id: "sec_faq_01",
-      order: 4,
-      type: "faq",
-      is_visible: true,
-      template_id: "FAQ__SPLIT_LEFT__LIGHT__v1_0",
-      config: {
-        background_color: "#ffffff",
-        padding_top: "xl",
-        padding_bottom: "xl",
-      },
-      content: {
-        heading: "Any questions?\nWe got you.",
-        subtext:
-          "Yet bed any for assistance indulgence unpleasing. Not thoughts all exercise blessing. Indulgence way everything joy alteration boisterous the attachment.",
-        more_faqs_cta: {
-          label: "More FAQs",
-          href: "/faq",
-          variant: "link",
-          icon_id: "arrow_right",
-        },
-        default_open_id: "item-1",
-        faqs: [
-          {
-            id: "item-1",
-            question: "Is my data safe with your platform?",
-            answer:
-              "Yes, we prioritize data security. We use industry-standard encryption for data at rest and in transit, and we are fully compliant with GDPR and SOC2 standards to ensure your information remains protected.",
-          },
-          {
-            id: "item-2",
-            question: "What kind of customer support do you offer?",
-            answer:
-              "We offer 24/7 customer support via email and live chat for all plans. Enterprise customers also get access to a dedicated account manager and priority phone support.",
-          },
-          {
-            id: "item-3",
-            question: "How does the pricing for your SaaS solution work?",
-            answer:
-              "Our pricing is tiered based on feature usage and seat count. We offer a free tier for startups, a Pro tier for growing teams, and custom Enterprise pricing. You can view our pricing page for more details.",
-          },
-          {
-            id: "item-4",
-            question: "Can I cancel my subscription at any time?",
-            answer:
-              "Absolutely. You can cancel your subscription directly from your account dashboard at any time. Your access will remain active until the end of your current billing cycle.",
-          },
-          {
-            id: "item-5",
-            question: "Can I upgrade or downgrade my subscription plan?",
-            answer:
-              "Yes, you can adjust your plan at any time. Upgrades take effect immediately with prorated billing, while downgrades are applied at the start of the next billing cycle.",
-          },
-        ],
-      },
-    },
-
-    {
-      id: "sec_faq_02",
-      order: 5,
-      type: "faq",
-      is_visible: true,
-      template_id: "FAQ__CENTERED__LIGHT__v1_0",
-      config: {
-        background_color: "#ffffff",
-        padding_top: "xl",
-        padding_bottom: "xl",
-      },
-      content: {
-        badge: {
-          label: "FAQ",
-          icon_id: "help_circle",
-          variant: "success",
-        },
-        heading: "Some of the things you\nmay want to know",
-        subtext: "We answered questions so you don't have to ask them.",
-        faqs: [
-          {
-            id: "item-1",
-            question: "Is my data safe with your platform?",
-            answer:
-              "Yes, we prioritize data security. We use industry-standard encryption for data at rest and in transit, and we are fully compliant with GDPR and SOC2 standards to ensure your information remains protected.",
-          },
-          {
-            id: "item-2",
-            question: "What kind of customer support do you offer?",
-            answer:
-              "We offer 24/7 customer support via email and live chat for all plans. Enterprise customers also get access to a dedicated account manager and priority phone support.",
-          },
-          {
-            id: "item-3",
-            question: "How does the pricing for your SaaS solution work?",
-            answer:
-              "Our pricing is tiered based on feature usage and seat count. We offer a free tier for startups, a Pro tier for growing teams, and custom Enterprise pricing. You can view our pricing page for more details.",
-          },
-          {
-            id: "item-4",
-            question: "Can I cancel my subscription at any time?",
-            answer:
-              "Absolutely. You can cancel your subscription directly from your account dashboard at any time. Your access will remain active until the end of your current billing cycle.",
-          },
-          {
-            id: "item-5",
-            question: "Can I upgrade or downgrade my subscription plan?",
-            answer:
-              "Yes, you can adjust your plan at any time. Upgrades take effect immediately with prorated billing, while downgrades are applied at the start of the next billing cycle.",
-          },
-        ],
-      },
-    },
-
-    {
-      id: "sec_newsletter_01",
-      order: 6,
-      type: "cta",
-      is_visible: true,
-      template_id: "CTA__SPLIT_RIGHT__DARK__v1_0",
-      config: {
-        background_color: "#ffffff",
-        padding_top: "xl",
-        padding_bottom: "xl",
-      },
-      content: {
-        heading: "Subscribe our newsletter",
-        subtext:
-          "Subscribe to our newsletter and be the first to receive insights, updates, and expert tips on optimizing your financial management.",
-        form_eyebrow: "Stay up to date",
-        input_placeholder: "Enter your email",
-        submit_label: "Subscribe",
-        privacy_notice: "By subscribing you agree to our",
-        privacy_policy_cta: {
-          label: "Privacy Policy",
-          href: "/privacy",
-          variant: "link",
         },
       },
     },
@@ -954,8 +705,13 @@ export const ResultPagePayload: PagePayloadSchema = {
       type: "result",
       template_id: "RESULT__SCORE_BREAKDOWN__LIGHT__v1_0",
       is_visible: true,
+      config: {
+        background_color: "#ffffff",
+        padding_top: "lg",
+        padding_bottom: "xl",
+      },
       content: {
-        heading: "Your personalised plan is ready",
+        heading: "Hi {{first_name}}, Your personalised plan is ready",
         // Demonstrates {{calc.*}} token interpolation alongside static copy.
         // The engine inserts the Intl-formatted values at result-page render time.
         subtext:
@@ -966,13 +722,60 @@ export const ResultPagePayload: PagePayloadSchema = {
       },
     },
 
+    // ── Score-tier Dynamic Content demo ───────────────────────────────────────
+    // isDynamic: true, source: overall → the eyebrow/heading/subtext actually
+    // rendered are picked from `variantsByTier[overallTier.id]`, resolved once
+    // per render via resolveDynamicContent() (see stores/funnelStore/helpers.ts).
+    // The top-level heading/subtext/eyebrow below remain the fallback — what
+    // renders if isDynamic were false, or if a tier is ever missing a variant.
+    {
+      id: "sec_result_content",
+      order: 1,
+      type: "detailed_category_results",
+      template_id: "CONTENT_LEFT_ALLIGNED_v1",
+      is_visible: true,
+      visibility: {
+        mode: "always-visible",
+      },
+      content: {
+        eyebrow: "agentic shopping",
+        heading: "Get real insights from real prompts",
+        subtext:
+          "Access the only source of real AI responses. See actual recommendations and citations of what AI is showing to users.",
+        dynamicContent: {
+          isDynamic: true,
+          source: { type: "overall" },
+          variantsByTier: {
+            tier_weakest: {
+              eyebrow: "room to grow",
+              heading: "Your results show real opportunity ahead",
+              subtext:
+                "Your answers point to a few clear gaps. The resources below are picked to help you close them fastest.",
+            },
+            tier_balanced: {
+              eyebrow: "solid footing",
+              heading: "You're closer than you think",
+              subtext:
+                "You've got a good foundation in place. A few focused changes could meaningfully move the needle.",
+            },
+            tier_strongest: {
+              eyebrow: "agentic shopping",
+              heading: "Get real insights from real prompts",
+              subtext:
+                "Access the only source of real AI responses. See actual recommendations and citations of what AI is showing to users.",
+            },
+          },
+        },
+      },
+    },
+
     // ── Audience-based: detailed breakdown for high-performers ──────────────
     // Rendered only when the respondent matches the "high_performers" audience
     // (overall score ≥ 67, i.e. Tier 3). Founders and PMs who are scaling fast
     // see an in-depth category analysis; others see the lighter overview above.
     {
       id: "sec_result_detailed_categories",
-      order: 1,
+      order: 2,
       type: "detailed_category_results",
       template_id: "DETAILEDCATEGORYRESULTS__CARD_GRID__LIGHT__v1_0",
       is_visible: true,
@@ -999,7 +802,7 @@ export const ResultPagePayload: PagePayloadSchema = {
     // rather than a self-serve upgrade flow that would be premature.
     {
       id: "sec_result_cta_early",
-      order: 2,
+      order: 3,
       type: "cta",
       template_id: "CTA__SPLIT_RIGHT__DARK__v1_0",
       is_visible: true,
@@ -1029,7 +832,7 @@ export const ResultPagePayload: PagePayloadSchema = {
     // activation but never renders during the current campaign.
     {
       id: "sec_result_hidden_upsell",
-      order: 3,
+      order: 4,
       type: "cta",
       template_id: "CTA__SPLIT_RIGHT__DARK__v1_0",
       is_visible: true,
@@ -1048,15 +851,6 @@ export const funnelPayload: funnelPayloadSchema = {
   slug: "", // URL path, e.g., "/about"
   title: "", // Internal CMS label, not rendered
   status: "draft",
-  //   config: ,
-  // ── Sample funnel theme ───────────────────────────────────────────────────
-  // Demonstrates the theming system end-to-end: a warm off-white page, a
-  // dark-teal/pale-green accent pairing that ties back into the existing
-  // newsletter card (templates/sections/cta.tsx uses these same hexes), and
-  // the spec's default Manrope/Source Sans 3 typographic pairing. Funnels
-  // with no `theme` field fall back to THEME_DEFAULTS (Tailwind's original
-  // blue/gray palette) with zero visual regression — this block is purely
-  // illustrative for QA-ing the theme pipeline end to end.
   theme: {
     colors: {
       page_background: { type: "color", value: "#FAFAF8" },
@@ -1100,6 +894,35 @@ export const funnelPayload: funnelPayloadSchema = {
       title: "Personalisation",
       description: "",
       icon: "⚖️",
+    },
+  ],
+  // ── Score tiers ────────────────────────────────────────────────────────────
+  // `id` is a stable, author-assigned slug — NOT a randomly generated value.
+  // Dynamic Content variant maps (ContentSection.dynamicContent.variantsByTier)
+  // and AudienceCondition's category_score/tier_id metric both key directly
+  // off this id; a non-deterministic id (e.g. uuid() re-minted on every module
+  // load) would silently orphan every variant/predicate authored against it.
+  scoreTiers: [
+    {
+      id: "tier_weakest",
+      label: "weakest",
+      color: "#92e161",
+      score_from: 0,
+      score_to: 33,
+    },
+    {
+      id: "tier_balanced",
+      label: "balanced",
+      color: "#40b43a",
+      score_from: 34,
+      score_to: 66,
+    },
+    {
+      id: "tier_strongest",
+      label: "strongest",
+      color: "#23810b",
+      score_from: 67,
+      score_to: 100,
     },
   ],
 
@@ -1308,43 +1131,6 @@ export const funnelPayload: funnelPayloadSchema = {
         label: "Email Address",
         placeholder: "you@example.com",
         required: true,
-      },
-      {
-        id: "first_name",
-        type: "first_name",
-        label: "First Name",
-        placeholder: "e.g. Jane",
-        required: false,
-      },
-      {
-        id: "last_name",
-        type: "last_name",
-        label: "Last Name",
-        placeholder: "e.g. Smith",
-        required: false,
-      },
-      {
-        id: "phone",
-        type: "phone",
-        label: "Phone Number",
-        placeholder: "+1 (555) 000-0000",
-        required: false,
-      },
-      {
-        id: "industry",
-        type: "industry",
-        label: "Industry",
-        placeholder: "Select your industry",
-        required: false,
-        options: [
-          { value: "tech", label: "Technology" },
-          { value: "finance", label: "Finance & Banking" },
-          { value: "healthcare", label: "Healthcare" },
-          { value: "real_estate", label: "Real Estate" },
-          { value: "education", label: "Education" },
-          { value: "retail", label: "Retail & E-Commerce" },
-          { value: "other", label: "Other" },
-        ],
       },
     ],
   },

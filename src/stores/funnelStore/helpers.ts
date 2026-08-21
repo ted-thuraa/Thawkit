@@ -18,6 +18,9 @@ import {
   AudienceDefinition,
   SectionVisibility,
   LeadData,
+  // ── Dynamic (score-tier) content types ────────────────────────────────────
+  DynamicContentConfig,
+  DynamicContentSource,
   // ── Calculation engine types ──────────────────────────────────────────────
   CalcExpression,
   CalcVariable,
@@ -481,6 +484,81 @@ export function resolveScoreTier(
   return tiers.reduce((closest, t) =>
     distanceToRange(t) < distanceToRange(closest) ? t : closest,
   );
+}
+
+// ─── Dynamic (score-tier) content resolution ───────────────────────────────
+//
+// Pure, store-free — same convention as resolveBracket()/resolveSectionVisibility()
+// above. Powers the "Dynamic Content Delivery on Result Pages" feature:
+// swaps a section's static text fields for the variant authored against the
+// respondent's resolved ScoreTier.
+
+/**
+ * Resolves the ScoreTier that a DynamicContentSource points at, given a
+ * computed FunnelScoreResult.
+ *
+ *  - "overall"  → scoreResult.overallTier (already resolved by computeFunnelScore).
+ *  - "category" → the matching CategoryScoreResult's tier. Returns null if the
+ *    category has no accumulated points in this scoring pass (e.g. its
+ *    questions haven't been traversed) — same "absent category" semantics
+ *    used elsewhere (computeFunnelScore omits zero-max categories entirely).
+ *
+ * Returns null whenever no tier can be resolved — including the case where
+ * the funnel was authored with zero scoreTiers, since resolveScoreTier()
+ * already returns null in that case. This is what satisfies the feature's
+ * "dynamic content is only available if scoreTiers have been defined"
+ * prerequisite with no extra guard clause required anywhere else.
+ */
+export function resolveDynamicSourceTier(
+  source: DynamicContentSource,
+  scoreResult: FunnelScoreResult,
+): ScoreTier | null {
+  if (source.type === "overall") return scoreResult.overallTier;
+
+  const category = scoreResult.categoryScores.find(
+    (c) => c.categoryId === source.categoryId,
+  );
+  return category?.tier ?? null;
+}
+
+/**
+ * Resolves the effective content object for a dynamic-content-capable
+ * section, given its base (static/default) fields and the respondent's
+ * scoreResult.
+ *
+ * Resolution order (first match wins):
+ *   1. `dynamicContent` is absent, or `isDynamic` is false → return `base`
+ *      unchanged. Zero regression for every section authored before this
+ *      feature, and the correct behaviour for sections that opt out.
+ *   2. No `scoreResult` yet (mid-funnel, or scoring hasn't run) → return
+ *      `base`. A section can only render tier-specific content once the
+ *      respondent has an actual computed score.
+ *   3. The resolved tier is null (no scoreTiers defined, or — for a
+ *      category source — the category hasn't been traversed) → return
+ *      `base`.
+ *   4. The resolved tier has no entry in `variantsByTier` → return `base`.
+ *      Defensive guard — same fallback convention as
+ *      DetailedCategoryResultsSectionContent.fallbackTemplate.
+ *   5. Otherwise → shallow-merge the tier's PARTIAL override onto `base`.
+ *      Any field the operator didn't author for this tier falls back to the
+ *      section's own base value — an operator can vary only `heading` for
+ *      one tier while leaving `subtext`/`eyebrow` untouched, for example.
+ */
+export function resolveDynamicContent<T extends Record<string, unknown>>(
+  base: T,
+  dynamicContent: DynamicContentConfig<T> | undefined,
+  scoreResult: FunnelScoreResult | null,
+): T {
+  if (!dynamicContent?.isDynamic) return base;
+  if (!scoreResult) return base;
+
+  const tier = resolveDynamicSourceTier(dynamicContent.source, scoreResult);
+  if (!tier) return base;
+
+  const variant = dynamicContent.variantsByTier[tier.id];
+  if (!variant) return base;
+
+  return { ...base, ...variant };
 }
 
 // ─── Answer label resolution ──────────────────────────────────────────────
