@@ -1,13 +1,15 @@
 // path: src/lib/queries/campaigns.ts
 
 import "server-only";
+import { cache } from "react";
 import { and, desc, eq, lt, or } from "drizzle-orm";
 import { db } from "@/drizzle/db";
-import { campaigns } from "@/drizzle/schemas/campaigns-schema";
+import { campaign } from "@/drizzle/schemas/campaigns-schema";
 import { requireOrgPermission } from "@/lib/auth/require-org-permission";
 import { WORKSPACE_ROLE_MATRIX } from "@/lib/workspace/permissions";
-import { ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import type {
+  CampaignDetail,
   CampaignDTO,
   CampaignListFilter,
   PaginatedResult,
@@ -45,21 +47,10 @@ function decodeCursor(raw: string): CampaignCursor {
   }
 }
 
-/**
- * Org-scoped, keyset-paginated campaign list for the /workspace dashboard.
- * Deliberately read-only in this deliverable — campaign creation/mutation
- * is a separate workstream not covered by the current feature scope.
- *
- * Uses keyset (cursor) pagination on (createdAt, id) instead of OFFSET —
- * see `campaigns_org_status_created_idx` in campaigns-schema.ts, which
- * covers this exact predicate + sort so MySQL never needs a filesort.
- */
 export async function listCampaigns(
   organizationId: string,
   filter: CampaignListFilter,
 ): Promise<PaginatedResult<CampaignDTO>> {
-  // Viewing the dashboard is available to any member — this call still
-  // verifies live membership, it just allows every role through.
   await requireOrgPermission(
     organizationId,
     WORKSPACE_ROLE_MATRIX.viewWorkspace,
@@ -71,23 +62,21 @@ export async function listCampaigns(
   );
   const cursor = filter.cursor ? decodeCursor(filter.cursor) : null;
 
-  const rows = await db.query.campaigns.findMany({
+  const rows = await db.query.campaign.findMany({
     where: and(
-      eq(campaigns.organizationId, organizationId),
-      filter.status !== "all" ? eq(campaigns.status, filter.status) : undefined,
+      eq(campaign.organizationId, organizationId),
+      filter.status !== "all" ? eq(campaign.status, filter.status) : undefined,
       cursor
         ? or(
-            lt(campaigns.createdAt, new Date(cursor.createdAt)),
+            lt(campaign.createdAt, new Date(cursor.createdAt)),
             and(
-              eq(campaigns.createdAt, new Date(cursor.createdAt)),
-              lt(campaigns.id, cursor.id),
+              eq(campaign.createdAt, new Date(cursor.createdAt)),
+              lt(campaign.id, cursor.id),
             ),
           )
         : undefined,
     ),
-    orderBy: [desc(campaigns.createdAt), desc(campaigns.id)],
-    // Fetch one extra row to detect whether a next page exists without a
-    // separate COUNT query.
+    orderBy: [desc(campaign.createdAt), desc(campaign.id)],
     limit: pageSize + 1,
     with: {
       creator: { columns: { id: true, name: true } },
@@ -116,3 +105,60 @@ export async function listCampaigns(
     hasMore,
   };
 }
+
+/**
+ * ADDED — the campaign-detail re-authorization check (Step 11 of the
+ * creation flow design). Called independently from
+ * `campaigns/[campaignId]/layout.tsx` AND each sub-route page
+ * (`overview`, `settings`, `analytics`), so it's wrapped in `cache()` to
+ * dedupe to a single query per request rather than re-fetching on every
+ * tab. Confirms the campaign both exists AND belongs to the caller's
+ * active org — a valid-looking id alone is never sufficient.
+ */
+export const getCampaignDetail = cache(
+  async (
+    organizationId: string,
+    campaignId: string,
+  ): Promise<CampaignDetail> => {
+    await requireOrgPermission(
+      organizationId,
+      WORKSPACE_ROLE_MATRIX.viewWorkspace,
+    );
+
+    const campaignItem = await db.query.campaign.findFirst({
+      where: and(
+        eq(campaign.id, campaignId),
+        eq(campaign.organizationId, organizationId),
+      ),
+      with: {
+        creator: { columns: { id: true, name: true } },
+        funnels: { orderBy: (funnel, { asc }) => [asc(funnel.createdAt)] },
+      },
+    });
+
+    if (!campaignItem) {
+      throw new NotFoundError("Campaign not found in this workspace.", {
+        organizationId,
+        campaignId,
+      });
+    }
+
+    return {
+      campaign: {
+        id: campaignItem.id,
+        name: campaignItem.name,
+        status: campaignItem.status,
+        createdAt: campaignItem.createdAt.toISOString(),
+        updatedAt: campaignItem.updatedAt.toISOString(),
+        createdBy: campaignItem.creator
+          ? { id: campaignItem.creator.id, name: campaignItem.creator.name }
+          : null,
+      },
+      funnels: campaignItem.funnels.map((funnel) => ({
+        id: funnel.id,
+        name: funnel.name,
+        createdAt: funnel.createdAt.toISOString(),
+      })),
+    };
+  },
+);

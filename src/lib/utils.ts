@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { projectFormSchema } from "./validators/project";
 import z from "zod";
 import { nanoid } from "nanoid";
 
@@ -62,6 +61,23 @@ export function slugify(text: string): string {
     .replace(/\s+/g, "-") // Replace spaces with -
     .replace(/[^\w-]+/g, "") // Remove all non-word chars
     .replace(/--+/g, "-"); // Replace multiple - with single -
+}
+
+/**
+ * Validate if a string is a valid UUID format
+ *
+ * @param str - The string to validate
+ * @returns True if the string matches UUID format (e.g., "550e8400-e29b-41d4-a716-446655440000")
+ *
+ * @example
+ * isValidUUID('550e8400-e29b-41d4-a716-446655440000') // true
+ * isValidUUID('ghi') // false
+ * isValidUUID('not-a-uuid') // false
+ */
+export function isValidUUID(str: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
 }
 
 /**
@@ -141,21 +157,37 @@ export const extractTextFromHtml = (text: string): string => {
 };
 
 /**
- * Generates a new unique ID, preserving the original prefix if present.
- * e.g., "section-abc" -> "section-xyz"
- * @param originalId The original ID string.
- * @returns A new unique ID string.
+ * Generate a unique ID with optional prefix
+ * @param prefix - Optional 3 letter prefix to prepend (e.g., 'lyr' for 'layer')
+ * @returns Unique ID string (e.g., "lyr-mip1xm2qt9vvh")
  */
-const generateNewId = (originalId: string): string => {
-  const parts = originalId.split("-");
-  // Check if the ID starts with a known prefix (e.g., "section-", "container-", "text-")
-  if (parts.length > 1) {
-    // Rejoin all parts except the last (the old ID) to get the prefix
-    const prefix = parts.slice(0, -1).join("-");
-    return `${prefix}-${nanoid(8)}`;
+export function generateId(prefix?: string): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.floor(Math.random() * 36 ** 6).toString(36);
+  const id = `${timestamp}${random}`;
+  return prefix ? `${prefix}-${id}` : id;
+}
+
+/**
+ * Deep clone object
+ * @param obj - The object to clone
+ * @returns Deep cloned copy of the object
+ */
+export function cloneDeep<T>(obj: T): T {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (obj instanceof Date) return new Date(obj.getTime()) as T;
+  if (obj instanceof Array) return obj.map((item) => cloneDeep(item)) as T;
+  if (obj instanceof Object) {
+    const clonedObj = {} as Record<string, unknown>;
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        clonedObj[key] = cloneDeep((obj as Record<string, unknown>)[key]);
+      }
+    }
+    return clonedObj as T;
   }
-  return nanoid(8); // Fallback for IDs without a prefix
-};
+  throw new Error("Unable to clone object");
+}
 
 export const sanitizeDomain = (domain: string): string => {
   let cleanedDomain = domain;

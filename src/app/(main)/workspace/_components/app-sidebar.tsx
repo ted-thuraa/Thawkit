@@ -1,28 +1,13 @@
+// path: src/app/(main)/workspace/_components/app-sidebar.tsx
+
 "use client";
 
 import * as React from "react";
-import {
-  BookOpen,
-  Bot,
-  Command,
-  Folders,
-  Frame,
-  Hexagon,
-  House,
-  LayoutGrid,
-  LifeBuoy,
-  Map,
-  MessageSquare,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-  SwatchBook,
-  Users,
-  Users2,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Hexagon, LayoutGrid, Settings2, Users2 } from "lucide-react";
 
 import { NavMain } from "@/app/(main)/workspace/_components/nav-main";
-import { OrganisationsSwitcher } from "@/app/(main)/workspace/_components/team-switcher";
+import { OrganisationsSwitcher } from "@/app/(main)/workspace/_components/org-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -30,50 +15,50 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { usePathname } from "next/navigation";
-import { authClient } from "@/lib/auth/auth-client";
 import { UpgradeCard } from "./upgradecard";
-import { ThawkitLogo } from "@/components/global/appLogo";
+import type { listOrganizations } from "@/actions/organization.actions";
 
-type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {};
+type OrganizationSummary = Awaited<
+  ReturnType<typeof listOrganizations>
+>[number];
 
-export function AppSidebar(props: AppSidebarProps) {
+type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
+  organizations: OrganizationSummary[];
+  activeOrganizationId: string;
+};
+
+export function AppSidebar({
+  organizations,
+  activeOrganizationId,
+  ...props
+}: AppSidebarProps) {
   const pathname = usePathname();
-  const { data: organizations } = authClient.useListOrganizations();
-  const { data: activeOrganization } = authClient.useActiveOrganization();
 
-  const data = {
-    user: {
-      name: "shadcn",
-      email: "m@example.com",
-      avatar: "/avatars/shadcn.jpg",
+  const navMain = [
+    {
+      title: "Overview",
+      url: "",
+      icon: LayoutGrid,
+      isActive: pathname === "",
+      items: [],
     },
-    organisations: organizations,
-    navMain: [
-      {
-        title: "Projects",
-        url: `/workspace`,
-        icon: LayoutGrid,
-        isActive: pathname === `/workspace`,
-        items: [],
-      },
-      {
-        title: "Templates",
-        url: `/workspace/templates`,
-        isActive: pathname === `/workspace/templates`,
-        icon: Users2,
-        items: [],
-      },
-
-      {
-        title: "Settings",
-        url: `/workspace/settings`,
-        isActive: pathname === `/workspace/settings`,
-        icon: Settings2,
-        items: [],
-      },
-    ],
-  };
+    {
+      title: "Editor",
+      url: "/workspace/templates",
+      isActive: pathname === "/",
+      icon: Users2,
+      items: [],
+    },
+    {
+      title: "Settings",
+      url: "/",
+      // startsWith rather than exact match: /workspace/settings/team and
+      // /workspace/settings/overview should both highlight this nav item.
+      isActive: pathname.startsWith("/"),
+      icon: Settings2,
+      items: [],
+    },
+  ];
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -87,13 +72,13 @@ export function AppSidebar(props: AppSidebarProps) {
           </span>
         </div>
         <OrganisationsSwitcher
-          orgs={data.organisations}
-          activeOrg={activeOrganization}
+          organizations={organizations}
+          activeOrganizationId={activeOrganizationId}
         />
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
 
       <SidebarFooter />

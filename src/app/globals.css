@@ -353,3 +353,22 @@
 .animate-fadeIn {
   animation: fadeIn 0.35s ease-out both;
 }
+
+.structure-pattern {
+  --size: 100px;
+  --color: var(--structure-card-border, var(--border));
+  --offset: calc(var(--size) / 20);
+  background-image:
+    conic-gradient(from 90deg at 1px 1px, transparent 90deg, var(--color) 0),
+    conic-gradient(
+      from 90deg at 1px 1px,
+      transparent 90deg,
+      color-mix(in srgb, var(--color) 50%, transparent) 0
+    );
+  background-size:
+    var(--size) var(--size),
+    calc(var(--size) / 10) calc(var(--size) / 10);
+  background-position:
+    var(--offset) var(--offset),
+    var(--offset) var(--offset);
+}

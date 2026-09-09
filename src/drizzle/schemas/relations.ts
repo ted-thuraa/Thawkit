@@ -5,6 +5,8 @@
 import { relations } from "drizzle-orm";
 import * as auth from "./auth-schema";
 import * as campaigns from "./campaigns-schema";
+import * as designSystem from "./design-system-schema";
+import * as funnelContent from "./funnel-content-schema";
 
 // ── User Relations ──────────────────────────────────────────────────────────
 export const userRelations = relations(auth.user, ({ many }) => ({
@@ -17,7 +19,7 @@ export const userRelations = relations(auth.user, ({ many }) => ({
   subscriptions: many(auth.subscription),
   // ADDED: reverse side of campaignRelations' `creator` — lets
   // `db.query.user.findFirst({ with: { createdCampaigns: true } })` work.
-  createdCampaigns: many(campaigns.campaigns, {
+  createdCampaigns: many(campaigns.campaign, {
     relationName: "campaignCreator",
   }),
 }));
@@ -72,11 +74,17 @@ export const organizationRelations = relations(
     activeSessions: many(auth.session, {
       relationName: "activeauth.organizationessions",
     }),
-    campaigns: many(campaigns.campaigns, {
+    campaigns: many(campaigns.campaign, {
       relationName: "organizationCampaigns",
     }),
-    funnels: many(campaigns.funnels, {
+    funnels: many(campaigns.funnel, {
       relationName: "organizationFunnels",
+    }),
+    components: many(designSystem.component, {
+      relationName: "organizationComponents",
+    }),
+    layerStyles: many(designSystem.layerStyle, {
+      relationName: "organizationLayerStyles",
     }),
   }),
 );
@@ -123,36 +131,116 @@ export const subscriptionRelations = relations(
 
 // ── Campaign Relations ──────────────────────────────────────────────────────
 export const campaignRelations = relations(
-  campaigns.campaigns,
+  campaigns.campaign,
   ({ one, many }) => ({
     organization: one(auth.organization, {
-      fields: [campaigns.campaigns.organizationId],
+      fields: [campaigns.campaign.organizationId],
       references: [auth.organization.id],
       relationName: "organizationCampaigns",
     }),
     // ADDED: powers `listCampaigns`' `with: { creator: ... }` join used to
     // populate CampaignDTO.createdBy on the /workspace dashboard.
     creator: one(auth.user, {
-      fields: [campaigns.campaigns.createdBy],
+      fields: [campaigns.campaign.createdBy],
       references: [auth.user.id],
       relationName: "campaignCreator",
     }),
-    funnels: many(campaigns.funnels, {
+    funnels: many(campaigns.funnel, {
       relationName: "campaignFunnels",
     }),
   }),
 );
 
 // ── Funnel Relations ────────────────────────────────────────────────────────
-export const funnelRelations = relations(campaigns.funnels, ({ one }) => ({
+export const funnelRelations = relations(campaigns.funnel, ({ one, many }) => ({
   organization: one(auth.organization, {
-    fields: [campaigns.funnels.organizationId],
+    fields: [campaigns.funnel.organizationId],
     references: [auth.organization.id],
     relationName: "organizationFunnels",
   }),
-  campaign: one(campaigns.campaigns, {
-    fields: [campaigns.funnels.campaignId],
-    references: [campaigns.campaigns.id],
+  campaign: one(campaigns.campaign, {
+    fields: [campaigns.funnel.campaignId],
+    references: [campaigns.campaign.id],
     relationName: "campaignFunnels",
   }),
+  pages: many(funnelContent.pages, {
+    relationName: "funnelPages",
+  }),
+  funnelVersions: many(funnelContent.funnelVersions, {
+    relationName: "funnelVersions",
+  }),
+  questionCategories: many(funnelContent.questionCategories, {
+    relationName: "funnelQuestionCategories",
+  }),
 }));
+
+// ── Funnel Version Relations ────────────────────────────────────────────────
+export const funnelVersionsRelations = relations(
+  funnelContent.funnelVersions,
+  ({ one }) => ({
+    funnel: one(campaigns.funnel, {
+      fields: [funnelContent.funnelVersions.funnelId],
+      references: [campaigns.funnel.id],
+      relationName: "funnelVersions",
+    }),
+  }),
+);
+
+// ── Page Relations ──────────────────────────────────────────────────────────
+export const pagesRelations = relations(funnelContent.pages, ({ one }) => ({
+  funnel: one(campaigns.funnel, {
+    fields: [funnelContent.pages.funnelId],
+    references: [campaigns.funnel.id],
+    relationName: "funnelPages",
+  }),
+}));
+
+// ── Question Category Relations ─────────────────────────────────────────────
+export const questionCategoriesRelations = relations(
+  funnelContent.questionCategories,
+  ({ one }) => ({
+    funnel: one(campaigns.funnel, {
+      fields: [funnelContent.questionCategories.funnelId],
+      references: [campaigns.funnel.id],
+      relationName: "funnelQuestionCategories",
+    }),
+  }),
+);
+
+// ── Audience Relations ──────────────────────────────────────────────────────
+// CHANGED (this pass): now belongs to `campaign`, not `funnel` — see the
+// decision note in funnel-content-schema.ts.
+export const audiencesRelations = relations(
+  funnelContent.audiences,
+  ({ one }) => ({
+    funnel: one(campaigns.campaign, {
+      fields: [funnelContent.audiences.funnelId],
+      references: [campaigns.campaign.id],
+      relationName: "campaignAudiences",
+    }),
+  }),
+);
+
+// ── Component Relations ─────────────────────────────────────────────────────
+export const componentRelations = relations(
+  designSystem.component,
+  ({ one }) => ({
+    organization: one(auth.organization, {
+      fields: [designSystem.component.organizationId],
+      references: [auth.organization.id],
+      relationName: "organizationComponents",
+    }),
+  }),
+);
+
+// ── Layer Style Relations ───────────────────────────────────────────────────
+export const layerStyleRelations = relations(
+  designSystem.layerStyle,
+  ({ one }) => ({
+    organization: one(auth.organization, {
+      fields: [designSystem.layerStyle.organizationId],
+      references: [auth.organization.id],
+      relationName: "organizationLayerStyles",
+    }),
+  }),
+);

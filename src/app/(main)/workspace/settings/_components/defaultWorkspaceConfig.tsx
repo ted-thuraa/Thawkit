@@ -19,7 +19,7 @@ import {
 import { NavMain } from "@/app/(main)/workspace/_components/nav-main";
 import { NavProjects } from "@/app/(main)/workspace/_components/nav-projects";
 import { NavUser } from "@/app/(main)/workspace/_components/nav-user";
-import { OrganisationsSwitcher } from "@/app/(main)/workspace/_components/team-switcher";
+import { OrganisationsSwitcher } from "@/app/(main)/workspace/_components/org-switcher";
 import {
   Sidebar,
   SidebarContent,

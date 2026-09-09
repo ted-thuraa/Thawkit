@@ -1,7 +1,13 @@
+// path: src/app/(main)/workspace/_components/org-switcher.tsx
+
 "use client";
 
 import * as React from "react";
-import { ChevronsUpDown, Plus } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ChevronsUpDown, Loader2, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   DropdownMenu,
@@ -17,73 +23,57 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Prettify } from "better-auth";
-import { Invitation, Member } from "better-auth/plugins/organization";
+import { setActiveOrganization } from "@/actions/organization.actions";
+import type { listOrganizations } from "@/actions/organization.actions";
 
-// --- Types ---
-
-type Organization = {
-  id: string;
-  name: string;
-  slug: string;
-  createdAt: Date;
-  logo?: string | null;
-  metadata?: any;
-};
-
-type OrganizationListItem = Organization;
-
-type ActiveOrganization = Prettify<
-  Organization & {
-    members: (Member & {
-      user: {
-        id: string;
-        name: string;
-        email: string;
-        image: string | undefined;
-      };
-    })[];
-    invitations: Invitation[];
-  }
-> | null;
+type OrganizationSummary = Awaited<
+  ReturnType<typeof listOrganizations>
+>[number];
 
 interface OrganisationsSwitcherProps {
-  orgs: OrganizationListItem[] | null;
-  activeOrg: ActiveOrganization;
+  organizations: OrganizationSummary[];
+  activeOrganizationId: string;
 }
 
-// --- Helper Function ---
-
-/**
- * Generates uppercase initials from a name.
- * "Workspace" -> "W"
- * "Johns Workspace" -> "JW"
- * "The Creative Studio" -> "TC"
- */
+/** "Workspace" -> "W", "Johns Workspace" -> "JW" */
 const getInitials = (name?: string | null): string => {
   if (!name) return "?";
-
   const words = name.trim().split(/\s+/).filter(Boolean);
-
   if (words.length === 0) return "?";
-
-  const firstInitial = words[0][0] || "";
-  const secondInitial = words[1]?.[0] || "";
-
-  if (words.length >= 2) {
-    return (firstInitial + secondInitial).toUpperCase();
-  }
-
-  return firstInitial.toUpperCase();
+  const first = words[0][0] ?? "";
+  const second = words[1]?.[0] ?? "";
+  return words.length >= 2
+    ? (first + second).toUpperCase()
+    : first.toUpperCase();
 };
 
-// --- Component ---
-
 export function OrganisationsSwitcher({
-  orgs,
-  activeOrg,
+  organizations,
+  activeOrganizationId,
 }: OrganisationsSwitcherProps) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+
+  const activeOrg =
+    organizations.find((org) => org.id === activeOrganizationId) ?? null;
+
+  function handleSwitch(organizationId: string, slug?: string | null) {
+    if (organizationId === activeOrganizationId || isPending) return;
+
+    setSwitchingId(organizationId);
+    startTransition(async () => {
+      try {
+        await setActiveOrganization(organizationId, slug ?? undefined);
+        router.refresh();
+      } catch {
+        toast.error("Couldn't switch workspace. Please try again.");
+      } finally {
+        setSwitchingId(null);
+      }
+    });
+  }
 
   if (!activeOrg) {
     return null;
@@ -116,27 +106,34 @@ export function OrganisationsSwitcher({
             <DropdownMenuLabel className="text-muted-foreground text-xs">
               Workspaces
             </DropdownMenuLabel>
-            {orgs?.map((org) => (
+            {organizations.map((org) => (
               <DropdownMenuItem
                 key={org.id}
-                // TODO: Implement organization switching logic
-                // onClick={() => handleOrgSwitch(org)}
+                onClick={() => handleSwitch(org.id, org.slug)}
+                disabled={isPending}
                 className="gap-2 p-2"
               >
                 <div className="p-1.5 bg-muted text-muted-foreground flex aspect-square size-7 items-center justify-center rounded-full border text-xs font-semibold uppercase">
                   {getInitials(org.name)}
                 </div>
-                <span className="truncate">{org.name}</span>
+                <span className="truncate flex-1">{org.name}</span>
+                {switchingId === org.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : org.id === activeOrganizationId ? (
+                  <span className="text-xs text-muted-foreground">Current</span>
+                ) : null}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2">
-              <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                <Plus className="size-4" />
-              </div>
-              <div className="text-muted-foreground font-medium">
-                Add Workspace
-              </div>
+            <DropdownMenuItem className="gap-2 p-2" asChild>
+              <Link href="/onboarding/create-workspace">
+                <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                  <Plus className="size-4" />
+                </div>
+                <div className="text-muted-foreground font-medium">
+                  Add Workspace
+                </div>
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

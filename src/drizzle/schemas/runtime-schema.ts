@@ -49,7 +49,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/mysql-core";
 import { organization } from "./auth-schema";
-import { funnels } from "./campaigns-schema";
+import { funnel } from "./campaigns-schema";
 import { funnelVersions, audiences } from "./funnel-content-schema";
 import type {
   LeadData,
@@ -131,7 +131,7 @@ export const submissions = mysqlTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     funnelId: varchar("funnel_id", { length: 191 })
       .notNull()
-      .references(() => funnels.id, { onDelete: "cascade" }),
+      .references(() => funnel.id, { onDelete: "cascade" }),
     funnelVersionId: varchar("funnel_version_id", { length: 191 })
       .notNull()
       .references(() => funnelVersions.id),

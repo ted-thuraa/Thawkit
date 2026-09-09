@@ -1,6 +1,9 @@
+// path: src/app/(main)/workspace/_components/workspaceLayout.tsx
+
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
+import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/app/(main)/workspace/_components/app-sidebar";
 import {
   Breadcrumb,
@@ -16,27 +19,48 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-
-import { useRouter } from "next/navigation";
-import { useCurrentSession } from "@/hooks/sessionClient";
 import { NavUser } from "./nav-user";
+import type { listOrganizations } from "@/actions/organization.actions";
+import type { WorkspaceContext } from "@/types/workspace";
+
+type OrganizationSummary = Awaited<
+  ReturnType<typeof listOrganizations>
+>[number];
 
 type Props = {
   children: React.ReactNode;
+  modal?: React.ReactNode;
+  context: WorkspaceContext;
+  organizations: OrganizationSummary[];
   user: {
     email: string;
     name: string;
-    image?: string | null | undefined;
+    image?: string | null;
   };
 };
 
-const WorkspaceLayout = ({ children, user }: Props) => {
-  const router = useRouter();
-  const { data: session } = useCurrentSession();
+function usePageLabel(): string {
+  const pathname = usePathname();
+  if (pathname.startsWith("/workspace/settings")) return "Settings";
+  if (pathname.startsWith("/workspace/templates")) return "Templates";
+  return "Projects";
+}
+
+const WorkspaceLayout = ({
+  children,
+  modal,
+  context,
+  organizations,
+  user,
+}: Props) => {
+  const pageLabel = usePageLabel();
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        organizations={organizations}
+        activeOrganizationId={context.organizationId}
+      />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex flex-1 items-center gap-2 px-4">
@@ -48,13 +72,13 @@ const WorkspaceLayout = ({ children, user }: Props) => {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    Building Your Application
+                  <BreadcrumbLink href="/workspace">
+                    {context.organizationName}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                  <BreadcrumbPage>{pageLabel}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -63,7 +87,6 @@ const WorkspaceLayout = ({ children, user }: Props) => {
             <NavUser user={user} />
           </div>
         </header>
-        {/* <div className="flex flex-1 flex-col gap-4 p-4 pt-0"></div> */}
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 p-4 md:gap-6 md:py-6 md:px-[3.4rem]">
@@ -72,6 +95,7 @@ const WorkspaceLayout = ({ children, user }: Props) => {
           </div>
         </div>
       </SidebarInset>
+      {modal}
     </SidebarProvider>
   );
 };

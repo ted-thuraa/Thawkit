@@ -12,7 +12,7 @@ import { organization, user } from "./auth-schema";
 export const campaignStatusValues = ["draft", "live", "archived"] as const;
 export type CampaignStatusValue = (typeof campaignStatusValues)[number];
 
-export const campaigns = mysqlTable(
+export const campaign = mysqlTable(
   "campaigns",
   {
     id: varchar("id", { length: 255 }).primaryKey(),
@@ -45,7 +45,7 @@ export const campaigns = mysqlTable(
   }),
 );
 
-export const funnels = mysqlTable(
+export const funnel = mysqlTable(
   "funnels",
   {
     id: varchar("id", { length: 255 }).primaryKey(),
@@ -54,7 +54,7 @@ export const funnels = mysqlTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     campaignId: varchar("campaign_id", { length: 255 })
       .notNull()
-      .references(() => campaigns.id, { onDelete: "cascade" }),
+      .references(() => campaign.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

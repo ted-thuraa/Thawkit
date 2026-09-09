@@ -53,6 +53,17 @@ export interface PaginatedResult<T> {
   hasMore: boolean;
 }
 
+export interface FunnelDTO {
+  id: string;
+  name: string;
+  createdAt: string; // ISO 8601
+}
+
+export interface CampaignDetail {
+  campaign: CampaignDTO;
+  funnels: FunnelDTO[];
+}
+
 export interface OrganizationOverviewDTO {
   id: string;
   name: string;

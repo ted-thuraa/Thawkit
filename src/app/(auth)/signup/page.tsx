@@ -47,10 +47,7 @@ export default function SignUpPage() {
             <CardTitle>Sign Up</CardTitle>
           </CardHeader>
           <CardContent>
-            <SignUpTab
-              openEmailVerificationTab={openEmailVerificationTab}
-              openForgotPassword={openForgotPassword}
-            />
+            <SignUpTab openEmailVerificationTab={openEmailVerificationTab} />
           </CardContent>
 
           <Separator />

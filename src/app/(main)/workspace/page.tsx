@@ -1,106 +1,84 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  ArrowUpDown,
-  ChevronDown,
-  Grid3X3,
-  LayoutGrid,
-  List,
-  MoreHorizontal,
-  Plus,
-  Search,
-} from "lucide-react";
-import Image from "next/image";
-import React from "react";
-import ProjectsList from "@/app/_components/projectsList";
+// path: src/app/(main)/workspace/page.tsx
 
-type Props = {
-  searchParams: {
-    state: string;
-    code: string;
-    inviteWorkspace?: string; // Add this to handle invite redirects
-  };
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ChevronRight, Plus } from "lucide-react";
+import { resolveWorkspaceContext } from "@/lib/workspace/resolve-workspace-context";
+import { CampaignsList } from "./_components/campaignsList";
+import { CampaignStatusFilter } from "./_components/campaignStatusFilter";
+import type { CampaignStatus } from "@/types/workspace";
+import { listCampaigns } from "@/lib/querries/campaigns";
+import { Button } from "@/components/ui/button";
+
+const VALID_STATUSES: readonly string[] = ["all", "draft", "live", "archived"];
+
+type SearchParams = {
+  status?: string;
+  cursor?: string;
 };
 
-const WorkSpaceMainPage = async ({ searchParams }: Props) => {
-  //const projectsData = await getOrganizationProjects();
+export default async function WorkSpaceMainPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const resolution = await resolveWorkspaceContext();
+  if (resolution.kind === "redirect") {
+    redirect(resolution.to);
+  }
 
-  // 2. Check the result structure (Error Handling)
-  //let projects: BasicProjectListItem[] = [];
+  const resolvedSearchParams = await searchParams;
+  const status: CampaignStatus | "all" = VALID_STATUSES.includes(
+    resolvedSearchParams.status ?? "",
+  )
+    ? (resolvedSearchParams.status as CampaignStatus | "all")
+    : "all";
 
-  // if (projectsData.success) {
-  //   projects = projectsData.data;
-  // } else {
-  //   // 3. Handle the error case (e.g., show an error message, log it)
-  //   console.error("Error fetching projects:", projectsData.error);
-  //   // You could render an error state component here instead of the list
-  //   return null;
-  // }
+  // Throws AppError on failure (e.g. ForbiddenError) — expected to be
+  // caught by this route segment's error.tsx, per the queries-throw /
+  // actions-return-ActionResult split from the backend design.
+  const campaigns = await listCampaigns(resolution.context.organizationId, {
+    status,
+    cursor: resolvedSearchParams.cursor ?? null,
+  });
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between ">
+        <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-semibold text-gray-800">Projects</h3>
+          <Button asChild>
+            <Link href="/workspace/campaigns/new">
+              <Plus className="size-4" />
+              New Campaign
+            </Link>
+          </Button>
         </div>
 
-        <div className="mb-6 flex flex-row flex-nowrap items-center justify-between gap-6 ">
-          <div className="flex flex-row items-center gap-x-4">
-            {/* <h3 className="leading-none font-semibold">Filter by</h3> */}
-            <Select>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Status</SelectLabel>
-                  <SelectItem value="apple">draft</SelectItem>
-                  <SelectItem value="banana">published</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="px-2 ">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              className=" *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex text-primary"
+        <div className="w-full mb-6 flex flex-row flex-nowrap items-center justify-between gap-6">
+          <CampaignStatusFilter
+            currentStatus={status}
+            orgId={resolution.context.organizationId}
+          />
+        </div>
+
+        <CampaignsList
+          campaigns={campaigns.items}
+          orgId={resolution.context.organizationId}
+        />
+
+        {campaigns.hasMore && campaigns.nextCursor && (
+          <div className="mt-6 flex justify-center">
+            <Link
+              href={`/workspace?status=${status}&cursor=${encodeURIComponent(campaigns.nextCursor)}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
-              <ToggleGroupItem value="list">
-                <List className="w-4 h-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="grid">
-                <Grid3X3 className="w-4 h-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+              Load more
+              <ChevronRight className="size-4" />
+            </Link>
           </div>
-        </div>
-
-        <div className="text-gray-800">
-          app dashborad
-          {/* <ProjectsList projects={projects} /> */}
-        </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default WorkSpaceMainPage;
+}

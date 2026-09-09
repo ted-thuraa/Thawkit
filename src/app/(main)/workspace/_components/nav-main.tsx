@@ -45,8 +45,7 @@ export function NavMain({
               tooltip={item.title}
               className={cn(
                 " text-sidebar-foreground hover:text-sidebar-primary hover:bg-white transition-colors",
-                item.isActive &&
-                  "font-medium text-sidebar-primary bg-white shadow-sm"
+                item.isActive && "font-medium  shadow-sm",
               )}
             >
               <Link href={item.url}>

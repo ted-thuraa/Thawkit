@@ -59,12 +59,13 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/mysql-core";
-import { funnels } from "./campaigns-schema";
+import { funnel } from "./campaigns-schema";
 import type {
   PageSection,
   PageType,
   AudiencePredicate,
 } from "@/types/PageCMS/pageSchema";
+import { Layer } from "@/types/editor/layerSchema";
 
 // ─── Funnel Versions (immutable publish snapshots) ─────────────────────────
 //
@@ -83,10 +84,10 @@ export const funnelVersions = mysqlTable(
     id: varchar("id", { length: 191 }).primaryKey(),
     funnelId: varchar("funnel_id", { length: 191 })
       .notNull()
-      .references(() => funnels.id, { onDelete: "cascade" }),
+      .references(() => funnel.id, { onDelete: "cascade" }),
     versionNumber: int("version_number").notNull(),
-    // The exact funnelPayloadSchema shape — the same object initFunnel()
-    // already accepts on the frontend today. See compileFunnelPayload.ts.
+    // The compiled, published-shape payload — the frozen equivalent of this
+    // funnel's `pages` (now layer-tree-based) at publish time.
     compiledSchema: json("compiled_schema").notNull(),
     isCurrent: boolean("is_current").notNull().default(false),
     publishedAt: datetime("published_at")
@@ -108,19 +109,14 @@ export const funnelVersions = mysqlTable(
 export const pages = mysqlTable(
   "page",
   {
-    id: varchar("id", { length: 191 }).primaryKey(),
-    funnelId: varchar("funnel_id", { length: 191 })
+    id: varchar("id", { length: 255 }).primaryKey(),
+    funnelId: varchar("funnel_id", { length: 255 })
       .notNull()
-      .references(() => funnels.id, { onDelete: "cascade" }),
+      .references(() => funnel.id, { onDelete: "cascade" }),
 
     slug: varchar("slug", { length: 255 }).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     order: int("order").notNull(),
-
-    // Matches PagePayloadSchema.pageType exactly — the frontend type still
-    // uses "landing_page" (pageSchema.ts SECTION 6), not "main_page", so
-    // that's what this enum uses too. If the frontend ever renames it,
-    // this enum needs a matching migration in the same PR.
     pageType: mysqlEnum("page_type", [
       "landing_page",
       "normal_page",
@@ -130,20 +126,15 @@ export const pages = mysqlTable(
       .$type<PageType>(),
 
     isLinearDefault: boolean("is_linear_default").notNull().default(true),
-
-    // Both nullable JSON — `SEO_Metadata`/`PageConfig` aren't exported from
-    // pageSchema.ts (private interfaces), so these are structurally typed
-    // via PagePayloadSchema["seo"] / ["config"] at the call site instead of
-    // named directly. See compileFunnelPayload.ts.
     seo: json("seo"),
     config: json("config"),
 
-    // DECISION (this session): sections stored as JSON, not a table — see
-    // the file-level comment above. Typed via $type<>() so every read/write
-    // through Drizzle is checked against the real PageSection[] shape at
-    // compile time, even though MySQL itself does no structural validation
-    // on the column contents.
-    sections: json("sections").notNull().$type<PageSection[]>(),
+    // A generic, arbitrarily-nested layer tree — see types/PageCMS/layerSchema.ts
+    // and the file-level decision note above. Typed via $type<>() so every
+    // read/write through Drizzle is checked against the real Layer[] shape
+    // at compile time, even though MySQL does no structural validation on
+    // the column contents itself.
+    layers: json("layers").notNull().$type<Layer[]>(),
 
     createdAt: datetime("created_at")
       .notNull()
@@ -187,7 +178,7 @@ export const questionCategories = mysqlTable(
     id: varchar("id", { length: 191 }).primaryKey(),
     funnelId: varchar("funnel_id", { length: 191 })
       .notNull()
-      .references(() => funnels.id, { onDelete: "cascade" }),
+      .references(() => funnel.id, { onDelete: "cascade" }),
     // The mock's category ARRAY ORDER is meaningful (drives
     // DetailedCategoryResults card order) but has no equivalent in a
     // relational row without an explicit column — MySQL gives no ordering
@@ -219,7 +210,7 @@ export const audiences = mysqlTable(
     id: varchar("id", { length: 191 }).primaryKey(),
     funnelId: varchar("funnel_id", { length: 191 })
       .notNull()
-      .references(() => funnels.id, { onDelete: "cascade" }),
+      .references(() => funnel.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     predicate: json("predicate").notNull().$type<AudiencePredicate>(),

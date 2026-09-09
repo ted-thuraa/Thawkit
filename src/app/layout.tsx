@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AlertDialogProvider } from "@/providers/alert-dialog-provider";
 import { HydrationProvider } from "@/providers/react-query-provider";
+import DarkModeProvider from "@/providers/DarkModeProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,15 +13,15 @@ const inter = Inter({
   display: "swap",
 });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// const geistSans = Geist({
+//   variable: "--font-geist-sans",
+//   subsets: ["latin"],
+// });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// const geistMono = Geist_Mono({
+//   variable: "--font-geist-mono",
+//   subsets: ["latin"],
+// });
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -33,13 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="">
-      <body className={`${inter.variable} antialiased`}>
+    <html lang="en" className="overflow-hidden" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} antialiased`}
+        suppressHydrationWarning
+      >
         <HydrationProvider>
-          <AlertDialogProvider>
-            {children}
-            <Toaster position="top-right" />
-          </AlertDialogProvider>
+          <DarkModeProvider>
+            <AlertDialogProvider>
+              {children}
+              <Toaster position="top-right" />
+            </AlertDialogProvider>
+          </DarkModeProvider>
         </HydrationProvider>
       </body>
     </html>
