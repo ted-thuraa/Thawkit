@@ -65,6 +65,7 @@ export type UIState =
   | "disabled"
   | "current";
 export type Breakpoint = "mobile" | "tablet" | "desktop";
+export type StringAssetId = string;
 
 // ─── Design property interfaces ─────────────────────────────────────────────
 // Structured, per-category CSS properties. Ported verbatim from Ycode — this
@@ -266,13 +267,22 @@ export type LinkType = "url" | "email" | "phone" | "page";
 
 export interface LinkSettings {
   type: LinkType;
-  url?: string;
-  email?: string;
-  phone?: string;
-  /** Links to another page within the same funnel. */
-  page?: {
-    id: string; // references funnel-content-schema.ts's `pages.id`
+  url?: DynamicTextVariable;
+  email?: DynamicTextVariable;
+  phone?: DynamicTextVariable;
+  // Asset link - link to downloadable asset
+  asset?: {
+    id: StringAssetId | null;
   };
+
+  // Page link - link to a page (static or dynamic)
+  page?: {
+    id: string; // Page ID (static or dynamic)
+    collection_item_id?: string | null; // Collection item ID (for dynamic pages)
+  };
+
+  // Field link - href from collection field (CMS field containing URL)
+  field?: FieldVariable;
   /** Reference to a layer ID within the target to scroll to (#anchor). */
   anchor_layer_id?: string | null;
   target?: "_blank" | "_self" | "_parent" | "_top";
@@ -282,24 +292,120 @@ export interface LinkSettings {
 
 export type LinkSettingsValue = LinkSettings;
 
+export type SwiperAnimationEffect =
+  | "slide"
+  | "fade"
+  | "cube"
+  | "flip"
+  | "coverflow"
+  | "cards";
+export type SliderLoopMode = "none" | "loop" | "rewind";
+export type SliderPaginationType = "bullets" | "fraction";
+export type LightboxOverlay = "light" | "dark";
+export type LightboxFilesSource = "files" | "cms";
+
+export interface LightboxSettings {
+  files: string[]; // Asset IDs or external URLs (used when filesSource is 'files')
+  filesSource: LightboxFilesSource; // Whether files come from manual selection or a CMS field
+  filesField?: FieldVariable | null; // CMS field binding for dynamic images (used when filesSource is 'cms')
+  thumbnails: boolean;
+  navigation: boolean;
+  pagination: boolean;
+  zoom: boolean; // Pinch-to-zoom on touch devices
+  doubleTapZoom: boolean; // Double-tap/click to zoom
+  mousewheel: boolean; // Navigate slides with scroll wheel
+  overlay: LightboxOverlay;
+  groupId: string; // Links multiple lightboxes into one shared gallery
+  animationEffect: SwiperAnimationEffect;
+  easing: string;
+  duration: string; // Transition duration in seconds
+}
+
+/**
+ * A value that can either be a single number (applies to every breakpoint) or
+ * an object of per-breakpoint overrides. Desktop is the base; tablet/mobile
+ * fall back to larger breakpoints when unset (desktop-first).
+ */
+export type ResponsiveNumber = number | Partial<Record<Breakpoint, number>>;
+
 // ─── Layer settings (element-specific configuration) ───────────────────────
 // Pruned vs. Ycode: dropped `locale` (localization), `slider`/`lightbox`
 // (deferred widget features), `map` (third-party integration), and the
 // collection-bound select-options fields (`optionsSource`,
 // `selectOptionsMode`, `sortByCollectionId`, `sortByFieldIds`,
 // `isPlaceholder`).
+export interface SliderSettings {
+  navigation: boolean;
+  groupSlide: ResponsiveNumber; // Slides visible per view (responsive)
+  slidesPerGroup: ResponsiveNumber; // Slides advanced per navigation step (responsive)
+  loop: SliderLoopMode;
+  centered: boolean;
+  touchEvents: boolean;
+  slideToClicked: boolean;
+  mousewheel: boolean;
+
+  pagination: boolean;
+  paginationType: SliderPaginationType;
+  paginationClickable: boolean;
+  autoplay: boolean;
+  pauseOnHover: boolean;
+  delay: string; // Autoplay delay in seconds
+  animationEffect: SwiperAnimationEffect;
+  easing: string;
+  duration: string; // Transition duration in seconds
+}
 
 export interface LayerSettings {
   id?: string; // Custom HTML id attribute
   tag?: string; // HTML tag override (e.g., 'h1', 'h2')
   hidden?: boolean; // Element visibility in canvas
   customAttributes?: Record<string, string>;
+  locale?: {
+    format?: "locale" | "code"; // Display format for `localeSelector` layers (locale => 'English', code => 'EN')
+  };
   htmlEmbed?: {
     code?: string;
   };
+  slider?: SliderSettings; // Slider-specific settings (only for slider layers)
+  lightbox?: LightboxSettings; // Lightbox-specific settings (only for lightbox layers)
   form?: FormSettings; // Only meaningful on form layers
+  filterOnChange?: boolean; // For filter layers: trigger filtering on every input change (debounced)
+  optionsSource?: {
+    collectionId: string;
+    defaultItemId?: string; // item ID to pre-select as default (select elements)
+    defaultItemIds?: string[]; // item IDs to pre-check as defaults (checkbox groups)
+    sortFieldId?: string; // field ID to sort options by (undefined = manual/insertion order)
+    sortOrder?: "asc" | "desc"; // sort direction (defaults to 'asc')
+  };
+  selectOptionsMode?: "list" | "sort_by" | "sort_order"; // Builder source mode for select options
+  sortByCollectionId?: string; // Collection to source sort-by field options from
+  sortByFieldIds?: string[]; // Which field IDs are enabled as sort-by options
+  isPlaceholder?: boolean; // Marks an <option> child as a placeholder (disabled, hidden, selected)
+  map?: MapSettings; // Map-specific settings (only for map layers)
 }
 
+export type MapProvider = "mapbox" | "google";
+export type MapStyle = "streets" | "satellite" | "light" | "dark" | "outdoors";
+export type GoogleMapStyle = "roadmap" | "satellite";
+
+export interface MapProviderSettings {
+  style: string;
+  interactive: boolean;
+  scrollZoom: boolean;
+  showNavControl: boolean;
+  showScaleBar: boolean;
+}
+
+export interface MapSettings {
+  provider: MapProvider;
+  latitude: number;
+  longitude: number;
+  zoom: number;
+  markerColor: string | null;
+  search?: string;
+  mapbox: MapProviderSettings;
+  google: MapProviderSettings;
+}
 // ─── Layer styles (reusable combo-class chips) ─────────────────────────────
 // Lean shape shared with design-system-schema.ts's `layerStyle` table.
 // Versioning fields (`content_hash`, `is_published`, `deleted_at`) dropped —
@@ -393,10 +499,16 @@ export interface ImageSettingsValue {
   loading?: "lazy" | "eager";
 }
 
+// Component variable value type (text, image, link, audio, video, icon, and variant variables)
 export type ComponentVariableValue =
-  | string
+  | DynamicTextVariable
+  | DynamicRichTextVariable
   | ImageSettingsValue
-  | LinkSettingsValue;
+  | LinkSettingsValue
+  | AudioSettingsValue
+  | VideoSettingsValue
+  | IconSettingsValue
+  | VariantSettingsValue;
 
 export interface ComponentVariable {
   id: string;
@@ -505,15 +617,80 @@ export interface Layer {
   /** When set, this nested instance's variant is driven by the parent component's variable (by id), resolved at expansion time. */
   componentVariantVariableId?: string;
   componentOverrides?: {
-    text?: Record<string, ComponentVariableValue>;
-    image?: Record<string, ComponentVariableValue>;
-    link?: Record<string, ComponentVariableValue>;
-    variant?: Record<string, ComponentVariableValue>;
-    /** childVariableId -> parentVariableId, for pass-through from a nested component to its parent. */
-    variableLinks?: Record<string, string>;
+    text?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (text)
+    rich_text?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (rich text)
+    image?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (image)
+    link?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (link)
+    audio?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (audio)
+    video?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (video)
+    icon?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (icon)
+    variant?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (variant)
+    variableLinks?: Record<string, string>; // childVariableId → parentVariableId (pass-through from nested component to parent)
   };
+  // Layer variables (layer collection data & dynamic data for texts, assets, links)
+  variables?: LayerVariables;
 
   interactions?: LayerInteraction[];
+}
+
+export interface LayerVariables {
+  // Collection data
+  collection?: CollectionVariable;
+  conditionalVisibility?: ConditionalVisibility;
+
+  // Variables by type
+  text?: DynamicTextVariable | DynamicRichTextVariable;
+  icon?: {
+    src?: AssetVariable | StaticTextVariable; // Static Asset ID | Static Text (SVG code, internal use only)
+  };
+  image?: {
+    src: AssetVariable | FieldVariable | DynamicTextVariable; // Static Asset ID | Field Variable | Dynamic Text (URL that allows inline variables)
+    alt: DynamicTextVariable; // Image alt text with inline variables
+  };
+  audio?: {
+    src: AssetVariable | FieldVariable | DynamicTextVariable; // Static Asset ID | Field Variable | Dynamic Text (URL that allows inline variables)
+  };
+  video?: {
+    src?: AssetVariable | VideoVariable | FieldVariable | DynamicTextVariable; // Static Asset ID | Video provider + ID (YouTube) | Field Variable | Dynamic Text (URL that allows inline variables)
+    poster?: AssetVariable | FieldVariable; // Poster image (asset or field variable)
+  };
+  iframe?: {
+    src: DynamicTextVariable; // Embed URL (allow inline variables)
+  };
+  backgroundImage?: {
+    src: AssetVariable | FieldVariable | DynamicTextVariable; // Static Asset ID | Field Variable | Dynamic Text (URL)
+  };
+  link?: LinkSettings;
+
+  // Design property bindings (CMS color fields)
+  design?: {
+    backgroundColor?: DesignColorVariable;
+    color?: DesignColorVariable; // text color
+    borderColor?: DesignColorVariable;
+    divideColor?: DesignColorVariable;
+    outlineColor?: DesignColorVariable;
+    textDecorationColor?: DesignColorVariable;
+    placeholderColor?: DesignColorVariable;
+  };
+}
+
+/** A gradient stop with optional CMS field binding */
+export interface BoundColorStop {
+  id: string;
+  position: number;
+  color: string; // static fallback color
+  field?: FieldVariable; // optional CMS binding for this stop
+}
+
+export interface DesignColorVariable {
+  type: "color";
+  mode: "solid" | "linear" | "radial";
+  /** Solid mode: the CMS field binding */
+  field?: FieldVariable;
+  /** Linear gradient state (preserved across tab switches) */
+  linear?: { angle?: number; stops?: BoundColorStop[] };
+  /** Radial gradient state (preserved across tab switches) */
+  radial?: { stops?: BoundColorStop[] };
 }
 
 /** A layer without a required `id` (children may also omit ids), for reusable templates. */
@@ -521,3 +698,292 @@ export interface LayerTemplate extends Omit<Layer, "id" | "children"> {
   id?: string;
   children?: LayerTemplate[];
 }
+
+// Pagination Layer Definition (partial Layer for styling pagination controls)
+export interface PaginationLayerConfig {
+  classes?: string;
+  design?: DesignProperties;
+}
+
+// Layer Variable Types
+export interface CollectionPaginationConfig {
+  enabled: boolean;
+  mode: "pages" | "load_more";
+  items_per_page: number;
+  // Stylable pagination layer configurations
+  wrapperLayer?: PaginationLayerConfig;
+  prevButtonLayer?: PaginationLayerConfig;
+  nextButtonLayer?: PaginationLayerConfig;
+  pageInfoLayer?: PaginationLayerConfig;
+}
+
+export interface CollectionVariable {
+  id: string; // Collection ID
+  sort_by?: "none" | "manual" | "random" | string; // 'none', 'manual', 'random', or field ID
+  sort_order?: "asc" | "desc"; // Only used when sort_by is a field ID
+  sort_by_inputLayerId?: string; // Linked filter input controlling sort_by at runtime
+  sort_order_inputLayerId?: string; // Linked filter input controlling sort_order at runtime
+  limit?: number; // Maximum number of items to show (deprecated when pagination enabled)
+  offset?: number; // Number of items to skip (deprecated when pagination enabled)
+  source_field_id?: string; // Field ID from parent item (reference or multi-asset field), or field ID on child collection (inverse_reference)
+  source_field_type?:
+    | "reference"
+    | "multi_reference"
+    | "multi_asset"
+    | "inverse_reference"; // Type of source field
+  source_field_source?: "page" | "collection"; // Source of the field (page data or collection layer)
+  filters?: ConditionalVisibility; // Filter conditions to apply to collection items
+  pagination?: CollectionPaginationConfig; // Pagination settings for collection
+}
+
+export interface VisibilityCondition {
+  id: string;
+  source: "collection_field" | "page_collection" | "self";
+  // For collection_field source
+  fieldId?: string;
+  fieldType?: CollectionFieldType;
+  referenceCollectionId?: string; // For reference fields - the collection to fetch items from
+  operator: VisibilityOperator;
+  value?: string; // For is_one_of/is_not_one_of: JSON array of item IDs
+  value2?: string; // For 'is_between' date operator
+  // For page_collection source
+  collectionLayerId?: string;
+  collectionLayerName?: string; // Display name for the layer
+  compareOperator?: "eq" | "lt" | "lte" | "gt" | "gte"; // For 'item_count' operator
+  compareValue?: number; // For 'item_count' operator
+  // For self source: when true, the current dynamic page item ID is injected
+  // into the comparison set alongside any statically picked IDs in `value`.
+  includesCurrentPageItem?: boolean;
+  // How the compare value is sourced. Defaults to 'static' (uses `value`).
+  // 'current_page' binds the compare value to the current dynamic page item:
+  //   - reference/multi_reference fields compare against the page item's own ID
+  //     (the "Current Category/Tag" pattern)
+  //   - scalar fields compare against the value of `currentPageFieldId` on the
+  //     current page item
+  valueMode?: "static" | "current_page";
+  // For scalar fields with valueMode 'current_page': the field on the current
+  // dynamic page item whose value is used as the compare value.
+  currentPageFieldId?: string;
+  // For linking filter value to an input layer inside a Filter
+  inputLayerId?: string;
+  inputLayerId2?: string; // For second bound (e.g. 'is_between')
+  // Date fields only: marks the value as sourced from a filter form input
+  // (vs. a preset or custom date). Persisted so the UI stays in input mode
+  // even before an input is linked. Absent on conditions created before this
+  // existed — those fall back to linked-state/custom inference.
+  dateInput?: boolean;
+  // Same as `dateInput`, but for the second bound (`is_between`).
+  dateInput2?: boolean;
+}
+
+export interface VisibilityConditionGroup {
+  id: string;
+  conditions: VisibilityCondition[];
+}
+
+export interface ConditionalVisibility {
+  groups: VisibilityConditionGroup[];
+}
+
+/**
+ * A single condition in a serialized dynamic-date visibility rule (static export).
+ * Date-preset conditions are re-evaluated against the current date on the client;
+ * all other conditions carry their export-time result, baked in.
+ */
+export type DynamicVisibilityCondition =
+  | {
+      dynamic: true;
+      operator: VisibilityOperator;
+      value: string;
+      fieldValue: string;
+      dateOnly?: boolean;
+    }
+  | { dynamic: false; result: boolean };
+
+export type CollectionFieldType =
+  | "text"
+  | "number"
+  | "boolean"
+  | "date"
+  | "date_only"
+  | "color"
+  | "reference"
+  | "multi_reference"
+  | "rich_text"
+  | "image"
+  | "audio"
+  | "video"
+  | "document"
+  | "link"
+  | "email"
+  | "phone"
+  | "option"
+  | "count"
+  | "status";
+
+// Color Variables
+export interface ColorVariable {
+  id: string;
+  name: string;
+  value: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VariableType {
+  id?: string; // Reference to ComponentVariable.id (for component variable linking)
+  type:
+    | "field"
+    | "asset"
+    | "video"
+    | "dynamic_rich_text"
+    | "dynamic_text"
+    | "static_text"
+    | "pagination";
+  data: object;
+}
+
+// CMS Field Variable, used for CMS data binding and inline variables
+export interface FieldVariable extends VariableType {
+  type: "field";
+  data: {
+    field_id: string | null;
+    field_type: CollectionFieldType | null;
+    relationships: string[];
+    format?: string;
+    /**
+     * Source of the field data: 'page' for page collection, 'collection' for
+     * collection layer, 'global' for a site-wide global variable.
+     */
+    source?: "page" | "collection" | "global";
+    /** ID of the collection layer this field belongs to (for nested collections) */
+    collection_layer_id?: string;
+    /**
+     * ID of the global variable this binding points to (only when source is
+     * 'global'). When set, field_id mirrors this value so the existing
+     * resolution helpers can key on it uniformly.
+     */
+    global_id?: string;
+    /** Pre-resolved raw value from injectCollectionData (survives stripSSROnlyData) */
+    _resolvedValue?: string;
+  };
+}
+
+// Asset ID Variable, used for image, audio, video, etc.
+export interface AssetVariable extends VariableType {
+  type: "asset";
+  data: {
+    asset_id: StringAssetId | null;
+  };
+}
+
+// Asset ID Variable, used for image, audio, video, etc.
+export interface VideoVariable extends VariableType {
+  type: "video";
+  data: {
+    provider: "youtube"; // | 'vimeo'
+    video_id: string;
+  };
+}
+
+// Dynamic Text Variable, contains text with inline variables (without formatting)
+export interface DynamicTextVariable extends VariableType {
+  type: "dynamic_text";
+  data: {
+    content: string; // String with inline variables (no HTML)
+  };
+}
+
+// Dynamic Rich Text Variable, contains rich text with formatting (bold, italic, etc.) + inline variables
+export interface DynamicRichTextVariable extends VariableType {
+  type: "dynamic_rich_text";
+  data: {
+    content: object; // Tiptap JSON content with inline variables and formatting (bold, italic, etc.)
+  };
+}
+
+// Static Text Variable, contains text without formatting and without inline variables
+export interface StaticTextVariable extends VariableType {
+  type: "static_text";
+  data: {
+    content: string; // String without inline variables (no HTML)
+  };
+}
+
+// Pagination Variable, an inline variable that resolves to a live pagination
+// number (items shown/total, current/total pages) at render time. Lets the
+// pagination count/info texts ("Showing 6 of 20", "Page 1 of 3") be edited and
+// translated while keeping the numbers dynamic.
+export interface PaginationVariable extends VariableType {
+  type: "pagination";
+  data: {
+    key: "shown" | "total" | "current" | "pages";
+  };
+}
+
+export type InlineVariable = FieldVariable | PaginationVariable;
+
+/** Live pagination numbers used to resolve `pagination` inline variables. */
+export interface PaginationNumbers {
+  shown: number;
+  total: number;
+  current: number;
+  pages: number;
+}
+
+// Image settings value for component variables
+export interface ImageSettingsValue {
+  src?: AssetVariable | DynamicTextVariable | FieldVariable;
+  alt?: DynamicTextVariable;
+  width?: string;
+  height?: string;
+  loading?: "lazy" | "eager";
+}
+
+export type TextOperator =
+  | "is"
+  | "is_not"
+  | "contains"
+  | "does_not_contain"
+  | "is_present"
+  | "is_empty";
+export type NumberOperator = "is" | "is_not" | "lt" | "lte" | "gt" | "gte";
+export type DateOperator =
+  | "is"
+  | "is_before"
+  | "is_after"
+  | "is_between"
+  | "is_empty"
+  | "is_not_empty";
+export type BooleanOperator = "is";
+export type ReferenceOperator =
+  | "is_one_of"
+  | "is_not_one_of"
+  | "exists"
+  | "does_not_exist";
+export type MultiReferenceOperator =
+  | "is_one_of"
+  | "is_not_one_of"
+  | "contains_all_of"
+  | "contains_exactly"
+  | "item_count"
+  | "has_items"
+  | "has_no_items";
+export type PageCollectionOperator =
+  | "item_count"
+  | "has_items"
+  | "has_no_items";
+// Self filter: compare the item's own ID against a set of IDs (statically picked
+// and/or the current dynamic page item). Mirrors reference field semantics.
+export type SelfOperator = "is_one_of" | "is_not_one_of";
+
+export type VisibilityOperator =
+  | TextOperator
+  | NumberOperator
+  | DateOperator
+  | BooleanOperator
+  | ReferenceOperator
+  | MultiReferenceOperator
+  | PageCollectionOperator
+  | SelfOperator;

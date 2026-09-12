@@ -9,6 +9,7 @@ import { useLayerStylesStore } from "@/stores/editor/useLayerStylesStore";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { useComponentsStore } from "@/stores/editor/useComponentsStore";
 import { EditorBuilder } from "./EditorBuilder";
+import LeftPanel from "./LeftPanel";
 import { RightPanel } from "./RightPanel";
 
 /**
@@ -93,6 +94,36 @@ export function CampaignEditorMain({
     setCurrentPageId(activePage?.id ?? null);
   }, [activePage?.id, setCurrentPageId]);
 
+  // Same idea for component-edit mode: LeftPanel.tsx's Layers tab reads
+  // `editingComponentId`/`editingComponentVariantId` to decide whether to
+  // render a page's layer tree or a component variant's, and
+  // ComponentVariantsSection needs to know which variant the URL says is
+  // active. Without this sync, navigating to `/editor/components/[id]`
+  // would never actually flip the store into component-edit mode — the
+  // URL would say "component" but every store consumer would still think
+  // it's editing whatever page was open before.
+  const activeComponentId =
+    urlState.type === "component" ? urlState.resourceId : null;
+  const activeComponentVariantId =
+    urlState.type === "component" ? (urlState.variantId ?? null) : null;
+  const setEditingComponentId = useEditorStore(
+    (state) => state.setEditingComponentId,
+  );
+  const setEditingComponentVariantId = useEditorStore(
+    (state) => state.setEditingComponentVariantId,
+  );
+  useEffect(() => {
+    setEditingComponentId(activeComponentId);
+  }, [activeComponentId, setEditingComponentId]);
+  useEffect(() => {
+    if (activeComponentId)
+      setEditingComponentVariantId(activeComponentVariantId);
+  }, [
+    activeComponentId,
+    activeComponentVariantId,
+    setEditingComponentVariantId,
+  ]);
+
   if (needsPageRedirect) {
     if (pages.length === 0) {
       return (
@@ -113,7 +144,7 @@ export function CampaignEditorMain({
   if (urlState.type === "layers" && activePage) {
     return (
       <div className="h-full flex">
-        <EditorBody campaignId={campaignId} sidebarTab={urlState.sidebarTab} />
+        <LeftPanel campaignId={campaignId} />
         <EditorBuilder layers={activePage.layers} />
         <RightPanel />
       </div>
@@ -123,10 +154,7 @@ export function CampaignEditorMain({
   if (urlState.type === "page" && activePage) {
     return (
       <div className="h-full flex">
-        <EditorBody campaignId={campaignId} sidebarTab={urlState.sidebarTab} />
-        {/* Ycode keeps CenterCanvas mounted while the Pages sidebar is
-            active. Page settings are sidebar state/overlay, not a replacement
-            for the builder canvas. */}
+        <LeftPanel campaignId={campaignId} />
         <EditorBuilder layers={activePage.layers} />
         <RightPanel />
       </div>
@@ -139,7 +167,7 @@ export function CampaignEditorMain({
 
   return (
     <div className="h-full flex">
-      <EditorBody campaignId={campaignId} sidebarTab={urlState.sidebarTab} />
+      <LeftPanel campaignId={campaignId} />
       <div className="flex-1 h-full overflow-hidden flex items-center justify-center text-sm text-muted-foreground">
         {activeComponent ? (
           <>

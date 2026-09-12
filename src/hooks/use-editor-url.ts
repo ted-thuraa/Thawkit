@@ -248,6 +248,24 @@ export function useCampaignEditorUrl(campaignId: string) {
     [router, base, searchParams],
   );
 
+  /**
+   * Switch to the Pages tab WITHOUT opening the settings panel — the
+   * `pages` route type minus the `?edit=` param. Mirrors Ycode's split
+   * between `navigateToPage` (just shows the tree) and `navigateToPageEdit`
+   * (opens settings). Needed by LeftPanel.tsx's tab click handler: clicking
+   * "Pages" should show the list, not immediately pop open a page's
+   * settings form.
+   */
+  const navigateToPages = useCallback(
+    (pageId: string) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.delete("edit");
+      const query = params.toString();
+      router.push(`${base}/pages/${pageId}${query ? `?${query}` : ""}`);
+    },
+    [router, base, searchParams],
+  );
+
   const navigateToComponent = useCallback(
     (
       componentId: string,
@@ -290,6 +308,7 @@ export function useCampaignEditorUrl(campaignId: string) {
     urlState,
     navigateToLayers,
     navigateToPageSettings,
+    navigateToPages,
     navigateToComponent,
     navigateToEditor,
     replaceLayerIdInUrl,

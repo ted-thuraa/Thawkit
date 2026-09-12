@@ -24,73 +24,27 @@ import {
   createElementFromTemplate,
   type EditorElementType,
 } from "@/lib/editor/element-templates";
+import {
+  resetBindingsForDeletedCollection,
+  resetBindingsForDeletedField,
+} from "@/lib/layer-utils";
 
-/**
- * ─────────────────────────────────────────────────────────────────────────
- * Pruned port of Ycode's stores/usePagesStore.ts (3,152 lines,
- * github.com/ycode/ycode, MIT licensed). Ycode's version is this large
- * because it also owns: a whole PageFolder tree, lazy per-page draft
- * loading with an in-flight-request dedupe map, CMS-collection binding
- * cleanup, and every server-persisting CRUD operation. None of that
- * applies here — see below for exactly what and why.
- *
- * NO SEPARATE "DRAFT" CONCEPT: Ycode keeps `pages` (metadata) and
- * `draftsByPageId` (lazily-loaded layer trees) as two separate maps,
- * because a Ycode site can have hundreds of independent pages and eagerly
- * loading every one's full layer tree up front would be wasteful. A
- * funnel's page count is small and bounded (a handful of steps) by
- * definition, so resolve-editor-bootstrap.ts already loads every page's
- * `layers` eagerly, server-side, in Phase 3 — there is no lazy-load path
- * to port at all (`loadDraft`/`loadAllDrafts`/the `inflightDraftLoads`
- * dedupe map are simply absent here, not stubbed out). `pages` below IS
- * the draft; there's only one map.
- *
- * SYNCHRONOUS ONLY: every action here mutates in-memory state and returns
- * immediately — none of them talk to the server. Ycode's equivalent store
- * mixes these with async, API-calling actions (`createPage`, `saveDraft`,
- * `publishPage`, `setPageStatus`, `createComponentFromLayer`,
- * `batchReorderPagesAndFolders`, ...). Porting the tree-mutation algorithms
- * now and the persistence layer later (Phase 6, as real Server Actions
- * returning `ActionResult<T>` — not REST routes) keeps each piece
- * reviewable on its own, and avoids guessing at a persistence contract
- * before the Server Actions that will actually implement it exist.
- *
- * ALSO EXCLUDED, with reasons:
- *   - `folders`/`loadFolders`/`createFolder`/`updateFolder`/
- *     `duplicateFolder`/`deleteFolder` — PageFolder was evaluated and
- *     rejected for this project (see funnel-content-schema.ts's decision
- *     note on `pages.order`).
- *   - Ycode's full starter-blocks/layout library — this pass adds the
- *     essential primitive template pipeline, while large reusable layout
- *     blocks remain deferred until their project-specific catalog exists.
- *   - `setDraftGeneratedCss` — feeds a server-side Tailwind compilation
- *     pipeline for AI-built pages; no such pipeline exists here, and the
- *     canvas rendering approach itself isn't decided yet (Phase 5).
- *   - `updateStyleOnLayers`/`detachStyleFromAllLayers`/
- *     `updateComponentOnLayers`/`detachComponentFromAllLayers` — these
- *     propagate an edit or deletion at the shared Component/LayerStyle
- *     library level out to every page referencing it. Deferred until
- *     Phase 6 actually builds component/style editing — there's no point
- *     wiring "propagate the change" before "make the change" exists.
- *   - `cleanupDeletedCollection`/`cleanupDeletedField`/
- *     `updatePageCollectionItem`/`refetchPageCollectionItem` —
- *     CMS/Collections excluded entirely.
- *   - `deleteLayer`'s pagination-wrapper handling and `moveLayer`'s
- *     `resetBindingsAfterMove` — both CMS-collection-bound; not ported
- *     (see layer-tree-utils.ts's file header for the same exclusion on
- *     the utility side).
- *
- * "Duplicate"/"copy"/"paste" here are in-app, in-memory operations (hold a
- * layer's data in this store, insert a regenerated copy elsewhere in the
- * SAME editing session) — not the OS-clipboard bridging the original task
- * brief excluded (`useClipboardStore`/`useExternalPasteStore`, which
- * bridge in-app state to the system clipboard API and back). Those two
- * remain excluded; this is a different, narrower thing.
- * ─────────────────────────────────────────────────────────────────────────
- */
+export interface PageLayers {
+  id: string;
+  page_id: string;
+  layers: Layer[];
+  content_hash?: string; // SHA-256 hash of layers and CSS for change detection
+  is_published: boolean;
+  created_at: string;
+  updated_at?: string;
+  deleted_at: string | null; // Soft delete timestamp
+  generated_css?: string; // Extracted CSS from Play CDN for published pages
+}
 
 interface PagesState {
   pages: PageRow[];
+  draftsByPageId: Record<string, PageLayers>;
+  isLoading: boolean;
   error: string | null;
 }
 
@@ -140,6 +94,11 @@ interface PagesActions {
     targetLayerId: string,
     layerToPaste: Layer,
   ) => Layer | null;
+
+  // CMS Binding Cleanup Actions
+  cleanupDeletedCollection: (collectionId: string) => void;
+  cleanupDeletedField: (fieldId: string) => void;
+
   pasteInside: (
     pageId: string,
     targetLayerId: string,
@@ -160,6 +119,8 @@ function withUpdatedLayers(
 
 export const usePagesStore = create<PagesStore>((set, get) => ({
   pages: [],
+  draftsByPageId: {},
+  isLoading: false,
   error: null,
 
   setPages: (pages) => set({ pages }),
@@ -450,6 +411,46 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
       pages: withUpdatedLayers(state.pages, pageId, newLayers),
     }));
     return newLayer;
+  },
+
+  /**
+   * Reset CMS bindings referencing a deleted collection across all page drafts.
+   * Clears collection sources and field variables that reference the collection.
+   */
+  cleanupDeletedCollection: (collectionId) => {
+    const { draftsByPageId } = get();
+    const updatedDrafts = { ...draftsByPageId };
+
+    Object.keys(updatedDrafts).forEach((pageId) => {
+      const draft = updatedDrafts[pageId];
+      const cleaned = resetBindingsForDeletedCollection(
+        draft.layers,
+        collectionId,
+      );
+      if (cleaned !== draft.layers) {
+        updatedDrafts[pageId] = { ...draft, layers: cleaned };
+      }
+    });
+
+    set({ draftsByPageId: updatedDrafts });
+  },
+  /**
+   * Reset CMS bindings referencing a deleted field across all page drafts.
+   * Clears field variables, inline variables, and design bindings that use the field.
+   */
+  cleanupDeletedField: (fieldId) => {
+    const { draftsByPageId } = get();
+    const updatedDrafts = { ...draftsByPageId };
+
+    Object.keys(updatedDrafts).forEach((pageId) => {
+      const draft = updatedDrafts[pageId];
+      const cleaned = resetBindingsForDeletedField(draft.layers, fieldId);
+      if (cleaned !== draft.layers) {
+        updatedDrafts[pageId] = { ...draft, layers: cleaned };
+      }
+    });
+
+    set({ draftsByPageId: updatedDrafts });
   },
 
   pasteInside: (pageId, targetLayerId, layerToPaste) => {

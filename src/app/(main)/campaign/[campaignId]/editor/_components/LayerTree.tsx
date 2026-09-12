@@ -19,19 +19,32 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { UseLayerUpdatesReturn } from "@/hooks/use-layer-updates";
 import { getBreakpointPrefix } from "@/lib/breakpoint-utils";
 import {
+  canHaveChildren,
   extractBlockText,
   filterDisabledSliderLayers,
   getCollectionVariable,
   getLayerCmsFieldBinding,
   getRichTextSublayers,
   getTextStyleSublayers,
+  hasRichTextContent,
   isRichTextLayer,
   isTextContentLayer,
 } from "@/lib/layer-utils";
+import {
+  updateLayerInTree,
+  removeLayerById,
+  findLayerById,
+  findParentAndIndex,
+  insertLayerAfter,
+  regenerateIdsWithInteractionRemapping,
+  canMoveLayer,
+} from "@/lib/editor/layer-tree-utils";
+import { cloneDeep } from "lodash";
 import { FlattenedItem, flattenTree } from "@/lib/tree-utilities";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor/useEditorStore";
 import { usePagesStore } from "@/stores/editor/usePagesStore";
+import { useLocalisationStore } from "@/stores/editor/useLocalisationStore";
 import { Breakpoint, Layer } from "@/types/editor/layerSchema";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { Layers as LayersIcon, Component as ComponentIcon } from "lucide-react";
@@ -44,9 +57,104 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { getLayerIcon } from "@/lib/layer-display-utils";
+import { getLayerIcon, getLayerName } from "@/lib/layer-display-utils";
 import { useComponentsStore } from "@/stores/editor/useComponentsStore";
+import { Input } from "@/components/ui/input";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { getBlockName } from "@/lib/templates/blocks";
+import { useCollectionsStore } from "@/stores/editor/useCollectionsStore";
+import { MULTI_ASSET_COLLECTION_ID } from "@/lib/collection-field-utils";
 const ROW_HEIGHT = 32;
+
+/** `updateLayerProps(layers, layerId, updates)` — thin convenience wrapper around `updateLayerInTree` for a plain-object merge (the common case: rename, toggle a setting). */
+function updateLayerProps(
+  layers: Layer[],
+  layerId: string,
+  updates: Partial<Layer>,
+): Layer[] {
+  return updateLayerInTree(layers, layerId, (layer) => ({
+    ...layer,
+    ...updates,
+  }));
+}
+
+/**
+ * Small horizontal line + dot shown between rows while dragging, indicating
+ * where a layer will land. Visual convention matches PagesTree.tsx's
+ * above/below drop indicators (itself adapted from Ycode's PagesTree.tsx)
+ * so drag feedback looks consistent across both trees in the sidebar.
+ */
+function DropLineIndicator({
+  position,
+  offsetLeft,
+}: {
+  position: "above" | "below";
+  offsetLeft: number;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute left-0 right-0 h-[1.5px] bg-primary z-50 pointer-events-none",
+        position === "above" ? "top-0" : "bottom-0",
+      )}
+      style={{ marginLeft: `${offsetLeft}px` }}
+    >
+      <div className="absolute -top-[3px] -left-[5.5px] size-2 rounded-full border-[1.5px] bg-background border-primary" />
+    </div>
+  );
+}
+
+/**
+ * Right-click / "..." context menu for a single layer row. Replaces a
+ * reference to an undefined `LayerContextMenu` component left over from
+ * the original Ycode paste (that version also took `isLocked`,
+ * `liveLayerUpdates`, and `liveComponentUpdates` props for collaborative
+ * resource-locking — none of that exists in this project, see the
+ * removed `useCollaborationPresenceStore` usage above).
+ */
+function LayerContextMenu({
+  layerId,
+  isRoot,
+  readOnly,
+  onRename,
+  onDuplicate,
+  onDelete,
+  children,
+}: {
+  layerId: string;
+  isRoot: boolean;
+  readOnly?: boolean;
+  onRename: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  children: React.ReactNode;
+}) {
+  if (readOnly) return <>{children}</>;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-40">
+        <ContextMenuItem onSelect={onRename}>Rename</ContextMenuItem>
+        <ContextMenuItem onSelect={onDuplicate}>Duplicate</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          variant="destructive"
+          disabled={isRoot}
+          onSelect={onDelete}
+        >
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
 
 /**
  * Pointer-first collision detection for vertical tree rows.
@@ -134,6 +242,13 @@ function getLayerDisplayLabel(
 }
 
 interface LayerTreeStoreValues {
+  getComponentById: ReturnType<
+    typeof useComponentsStore.getState
+  >["getComponentById"];
+  collections: ReturnType<typeof useCollectionsStore.getState>["collections"];
+  fieldsByCollectionId: ReturnType<
+    typeof useCollectionsStore.getState
+  >["fields"];
   selectLayerWithSublayer: ReturnType<
     typeof useEditorStore.getState
   >["selectLayerWithSublayer"];
@@ -264,12 +379,13 @@ interface LayerRowProps {
   ) => void;
   onToggle: (id: string) => void;
   pageId: string;
-  LayerUpdates?: UseLayerUpdatesReturn | null;
   activeBreakpoint: Breakpoint;
   isRenaming: boolean;
   onRenameStart: (id: string) => void;
   onRenameConfirm: (id: string, newName: string | null) => void;
   onToggleVisibility: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
   readOnly?: boolean;
 }
 
@@ -305,13 +421,13 @@ const LayerRow = React.memo(function LayerRow({
   onMultiSelect,
   onToggle,
   pageId,
-  liveLayerUpdates,
-  liveComponentUpdates,
   activeBreakpoint,
   isRenaming,
   onRenameStart,
   onRenameConfirm,
   onToggleVisibility,
+  onDuplicate,
+  onDelete,
   readOnly,
 }: LayerRowProps) {
   const {
@@ -412,30 +528,18 @@ const LayerRow = React.memo(function LayerRow({
   // Get icon name from blocks template system (breakpoint-aware)
   const layerIcon = getLayerIcon(node.layer, "box", activeBreakpoint);
 
-  // Check if layer is locked by another user (using unified resource locks)
-  const currentUserId = useAuthStore((state) => state.user?.id);
-  const lockKey = getResourceLockKey(RESOURCE_TYPES.LAYER, node.id);
-  const lock = useCollaborationPresenceStore(
-    (state) => state.resourceLocks[lockKey],
-  );
-  // Access lock directly from state to avoid stale closure issues
-  const lockOwnerUser = useCollaborationPresenceStore((state) => {
-    const currentLock = state.resourceLocks[lockKey];
-    return currentLock?.user_id ? state.users[currentLock.user_id] : null;
-  });
-  const isLockedByOther = !!(
-    lock &&
-    lock.user_id !== currentUserId &&
-    Date.now() <= lock.expires_at
-  );
-
-  // Check if this is the Body layer (locked)
+  // Check if this is the Body layer (non-deletable root — see §5.5 of the
+  // handoff doc's "'body' root-layer convention"). No collaborative
+  // resource-locking in this project — Ycode's `isLockedByOther` (another
+  // user has this layer open) doesn't apply; that whole check was removed
+  // rather than stubbed to `false`, since `useAuthStore` and
+  // `useCollaborationPresenceStore` don't exist in this codebase at all.
   const isLocked = node.layer.id === "body";
 
   // Hover is driven by CSS :hover (via `group-hover/row:` on the wrapper) so
   // each mouseover/leave doesn't queue a React commit. Background colors for
   // both states are computed once per render and applied through CSS variables.
-  const canHover = !isDragActive && !isDragging && !isLockedByOther;
+  const canHover = !isDragActive && !isDragging;
 
   const rowBg =
     isSelected && !usePurpleStyle && !isStateActive
@@ -623,13 +727,11 @@ const LayerRow = React.memo(function LayerRow({
   return (
     <LayerContextMenu
       layerId={node.id}
-      pageId={pageId}
-      isLocked={isLocked}
-      onLayerSelect={onSelect}
-      liveLayerUpdates={liveLayerUpdates}
-      liveComponentUpdates={liveComponentUpdates}
-      editingComponentId={editingComponentId}
+      isRoot={node.id === "body"}
       readOnly={readOnly}
+      onRename={() => onRenameStart(node.id)}
+      onDuplicate={() => onDuplicate(node.id)}
+      onDelete={() => onDelete(node.id)}
     >
       <div
         className="relative flex group/row"
@@ -734,10 +836,7 @@ const LayerRow = React.memo(function LayerRow({
             data-drag-active={isDragActive}
             data-layer-id={node.id}
             className={cn(
-              "group relative flex items-center h-8 outline-none focus:outline-none",
-              isLockedByOther
-                ? "cursor-not-allowed opacity-60"
-                : "cursor-pointer",
+              "group relative flex items-center h-8 outline-none focus:outline-none cursor-pointer",
               isSelected && "text-primary-foreground",
               isSelected && isStateActive && "text-black",
               isSelected && usePurpleStyle && "text-white",
@@ -749,11 +848,6 @@ const LayerRow = React.memo(function LayerRow({
             style={{ width: "max-content", minWidth: "100%" }}
             onClick={(e) => {
               if (isRenaming) return;
-              if (isLockedByOther) {
-                e.stopPropagation();
-                e.preventDefault();
-                return;
-              }
               onSelect(node.id);
             }}
           >
@@ -896,20 +990,6 @@ const LayerRow = React.memo(function LayerRow({
                   } as React.CSSProperties
                 }
               >
-                {isLockedByOther && (
-                  <div className="mr-1 shrink-0">
-                    <CollaboratorBadge
-                      collaborator={{
-                        userId: lockOwnerUser?.user_id || "",
-                        email: lockOwnerUser?.email,
-                        color: lockOwnerUser?.color,
-                      }}
-                      size="xs"
-                      tooltipPrefix="Editing by"
-                    />
-                  </div>
-                )}
-
                 {interactionTriggerLayerIds.includes(node.id) && (
                   <Icon
                     name="zap"
@@ -1113,6 +1193,7 @@ function setLayersOpen(layers: Layer[], idsToOpen: Set<string>): Layer[] {
 }
 
 export default function LayersTree({
+  layers,
   onLayerSelect,
   onReorder,
   pageId,
@@ -1518,6 +1599,93 @@ export default function LayersTree({
       updateComponentDraft,
       flattenedNodes,
     ],
+  );
+
+  // Delete/duplicate — no equivalent wiring existed anywhere before this
+  // (the file imported a `Trash2` icon and never used it; there was no
+  // `onDelete`/`onDuplicate` prop on `LayerRowProps` at all). Mirrors the
+  // page-vs-component-draft branch established by handleRenameConfirm and
+  // handleToggleVisibility just above.
+  const deleteLayerAction = usePagesStore((state) => state.deleteLayer);
+  const duplicateLayerAction = usePagesStore((state) => state.duplicateLayer);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const setSelectedLayerId = useEditorStore((s) => s.setSelectedLayerId);
+
+  const handleDeleteLayer = useCallback(
+    (id: string) => {
+      if (id === "body") return; // non-deletable root — see layerSchema.ts's convention note
+
+      if (editingComponentId) {
+        const { componentDrafts } = useComponentsStore.getState();
+        const variantId = useEditorStore.getState().editingComponentVariantId;
+        const variantDrafts = componentDrafts[editingComponentId];
+        const targetVariantId =
+          variantId && variantDrafts?.[variantId]
+            ? variantId
+            : variantDrafts
+              ? Object.keys(variantDrafts)[0]
+              : null;
+        if (targetVariantId && variantDrafts) {
+          const compLayers = variantDrafts[targetVariantId] || [];
+          updateComponentDraft(
+            editingComponentId,
+            targetVariantId,
+            removeLayerById(compLayers, id),
+          );
+        }
+      } else {
+        deleteLayerAction(pageId, id);
+      }
+
+      if (selectedLayerId === id) setSelectedLayerId(null);
+    },
+    [
+      editingComponentId,
+      pageId,
+      deleteLayerAction,
+      updateComponentDraft,
+      selectedLayerId,
+      setSelectedLayerId,
+    ],
+  );
+
+  const handleDuplicateLayer = useCallback(
+    (id: string) => {
+      if (editingComponentId) {
+        const { componentDrafts } = useComponentsStore.getState();
+        const variantId = useEditorStore.getState().editingComponentVariantId;
+        const variantDrafts = componentDrafts[editingComponentId];
+        const targetVariantId =
+          variantId && variantDrafts?.[variantId]
+            ? variantId
+            : variantDrafts
+              ? Object.keys(variantDrafts)[0]
+              : null;
+        if (targetVariantId && variantDrafts) {
+          const compLayers = variantDrafts[targetVariantId] || [];
+          const original = findLayerById(compLayers, id);
+          const location = findParentAndIndex(compLayers, id);
+          if (original && location) {
+            const newLayer = regenerateIdsWithInteractionRemapping(
+              cloneDeep(original),
+            );
+            updateComponentDraft(
+              editingComponentId,
+              targetVariantId,
+              insertLayerAfter(
+                compLayers,
+                location.parent,
+                location.index,
+                newLayer,
+              ),
+            );
+          }
+        }
+      } else {
+        duplicateLayerAction(pageId, id);
+      }
+    },
+    [editingComponentId, pageId, duplicateLayerAction, updateComponentDraft],
   );
 
   // Configure sensors for drag detection
@@ -2649,6 +2817,8 @@ export default function LayersTree({
                   onRenameStart={handleRenameStart}
                   onRenameConfirm={handleRenameConfirm}
                   onToggleVisibility={handleToggleVisibility}
+                  onDuplicate={handleDuplicateLayer}
+                  onDelete={handleDeleteLayer}
                 />
               </VirtualLayerRow>
             );
